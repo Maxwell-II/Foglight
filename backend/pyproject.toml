@@ -1,0 +1,50 @@
+[project]
+name = "reading-saas-backend"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+# ⚠️ 契约文件：由规划方维护，执行 agent 不得修改。
+# 依赖已按 Wave 1 全部任务包预先声明齐全，各包不需要（也不允许）往这里加。
+# 确实缺库时停下来报告，不要自己加 —— 别的包正在并行改同一个仓库。
+dependencies = [
+    # Web 框架
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "python-multipart>=0.0.12",   # 文件上传（epub 导入用）
+
+    # 数据库
+    "sqlalchemy>=2.0",
+    "alembic>=1.14",
+
+    # 配置
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+
+    # 内容解析（P3 epub / P4 网页抓取）
+    "beautifulsoup4>=4.12",
+    "lxml>=5.3",
+    "readability-lxml>=0.8.1",
+    "httpx>=0.28",
+]
+
+# ❌ 禁止引入：spacy / nltk / pandas / numpy / scipy / torch
+#    理由见 docs/architecture.md §4.5：光加载模型就要 300-500MB，
+#    而 VPS 可用内存仅 698Mi 且 swap 已在使用，会挤爆机器并拖垮现有服务。
+#    NGSL 难度打分用纯文本词表 + set 查表即可，内存 < 1MB。
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
