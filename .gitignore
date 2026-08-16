@@ -1,0 +1,14 @@
+node_modules/
+dist/
+*.tsbuildinfo
+__pycache__/
+*.pyc
+.venv/
+.env
+*.db
+*.db-wal
+*.db-shm
+.DS_Store
+
+# 版权书摘，本地用 seed/extract_samples.py 生成（见 README）
+frontend/src/sampleArticles.json
