@@ -1,0 +1,168 @@
+:root {
+  --bg: #faf8f4;
+  --ink: #23201b;
+  --dim: #8a8378;
+  --line: #e4ded2;
+  --yellow: #ffe08a;
+  --yellow-edge: #d9a441;
+  --pink: #ffc9c9;
+  --pink-edge: #d9706f;
+  --preview: #cfe4ff;
+  --preview-edge: #5b9bd5;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Georgia, "Noto Serif SC", "PingFang SC", serif;
+}
+
+button { font-family: inherit; cursor: pointer; }
+
+/* ---------- 工具栏 ---------- */
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 10px 24px;
+  background: rgba(250, 248, 244, 0.95);
+  backdrop-filter: blur(6px);
+  border-bottom: 2px solid var(--line);
+  transition: border-color 0.15s;
+}
+/* 进入范围模式时整条工具栏变色 —— 让"现在是什么模式"一眼可见 */
+.toolbar--pink { border-bottom-color: var(--pink-edge); }
+.toolbar.is-extending { background: #fff2f2; }
+
+.pens { display: flex; gap: 8px; }
+.pen {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--dim);
+}
+.pen.is-active { color: var(--ink); border-color: var(--ink); font-weight: 600; }
+.pen .swatch { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+.pen--yellow .swatch { background: var(--yellow); border: 1px solid var(--yellow-edge); }
+.pen--pink .swatch { background: var(--pink); border: 1px solid var(--pink-edge); }
+kbd {
+  font: 11px/1 ui-monospace, monospace;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 2px 4px;
+  color: var(--dim);
+}
+
+.hint-text { font-size: 13px; color: var(--dim); flex: 1; }
+.right { display: flex; align-items: center; gap: 14px; }
+.counts { font-size: 13px; color: var(--dim); }
+.counts b { color: var(--ink); font-size: 15px; }
+
+.btn-primary {
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: #fff;
+  font-size: 14px;
+  padding: 8px 16px;
+  border-radius: 6px;
+}
+
+/* ---------- 正文 ---------- */
+.wrap { max-width: 720px; margin: 0 auto; padding: 24px 20px 120px; }
+
+.picker { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 28px; }
+.picker button {
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--dim);
+}
+.picker button.is-active { border-color: var(--ink); color: var(--ink); }
+
+.title { font-size: 26px; margin: 0 0 6px; }
+.meta { font-size: 13px; color: var(--dim); margin-bottom: 32px; }
+
+.article-body {
+  /* 关掉原生选择：我们用画笔，不用系统的拖选 */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.paragraph {
+  font-size: 17px;
+  line-height: 2;      /* 行高 2 同时也把点击目标撑高，为将来触屏做准备 */
+  margin: 0 0 22px;
+}
+
+.word {
+  cursor: pointer;
+  transition: background 0.08s;
+}
+.word:hover { background: rgba(0, 0, 0, 0.055); }
+
+/* 词间空格。跟着相邻两词一起高亮，让短语标记连成一道笔划而不是一串碎块。
+   必须用 pre-wrap 而不是 pre：pre 会让空格失去换行机会，整段文字溢出容器。 */
+.gap { white-space: pre-wrap; }
+
+.word.is-unknown,
+.gap.is-unknown { background: var(--yellow); box-shadow: inset 0 -2px 0 var(--yellow-edge); }
+
+.word.is-unclear,
+.gap.is-unclear { background: var(--pink); box-shadow: inset 0 -2px 0 var(--pink-edge); }
+
+.word.is-unknown.is-unclear {
+  background: linear-gradient(180deg, var(--yellow) 50%, var(--pink) 50%);
+}
+
+/* 实时预览：粉笔延伸过程中跟着鼠标走的那段 */
+.word.is-preview,
+.gap.is-preview {
+  background: var(--preview);
+  box-shadow: inset 0 -2px 0 var(--preview-edge);
+}
+
+/* ---------- 复盘 ---------- */
+.review { margin-top: 48px; border-top: 1px solid var(--line); padding-top: 24px; }
+.review h2 { font-size: 15px; margin: 24px 0 10px; }
+.dim { color: var(--dim); font-size: 14px; }
+.mark-list { list-style: none; padding: 0; margin: 0; }
+.mark-list li {
+  font-size: 14px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+}
+.mark-list .tag {
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  margin-right: 8px;
+}
+.li-yellow .tag { background: var(--yellow); }
+.li-pink .tag { background: var(--pink); }
+
+.export {
+  width: 100%;
+  min-height: 220px;
+  font: 12.5px/1.5 ui-monospace, Consolas, monospace;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 12px;
+  resize: vertical;
+}
