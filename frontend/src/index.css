@@ -166,3 +166,99 @@ kbd {
   margin-bottom: 12px;
   resize: vertical;
 }
+
+/* ---------- P9：文章库 / 导入 / 提示 ---------- */
+
+.back-link {
+  display: inline-block;
+  font-size: 13px;
+  color: var(--dim);
+  margin-bottom: 16px;
+  text-decoration: none;
+}
+.back-link:hover { color: var(--ink); }
+
+.error-banner {
+  background: #fff2f2;
+  border: 1px solid var(--pink-edge);
+  color: #a33;
+  font-size: 13px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+.library-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+.library-header .title { margin: 0; }
+.library-header .btn-primary { text-decoration: none; display: inline-block; }
+
+.article-grid {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.article-card { margin: 0; }
+.article-card__button {
+  width: 100%;
+  text-align: left;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: block;
+}
+.article-card__button:hover { border-color: var(--ink); }
+.article-card__button:disabled { opacity: 0.6; cursor: default; }
+.article-card__title { font-size: 16px; margin: 0 0 6px; }
+.article-card__meta { font-size: 13px; color: var(--dim); }
+.article-card__topics { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.topic-chip {
+  font-size: 11px;
+  color: var(--dim);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 2px 8px;
+}
+
+.import-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 640px;
+  margin-top: 20px;
+}
+.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--dim); }
+.field input,
+.field textarea {
+  font: inherit;
+  font-size: 15px;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #fff;
+}
+.import-text { min-height: 320px; line-height: 1.6; resize: vertical; }
+
+.sync-toast {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 20;
+  font-size: 13px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  max-width: 320px;
+}
+.sync-toast--error { background: #fff2f2; border: 1px solid var(--pink-edge); color: #a33; }
+.sync-toast--info { background: #f2f8ff; border: 1px solid var(--preview-edge); color: #2a5f96; }
