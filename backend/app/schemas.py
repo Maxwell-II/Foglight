@@ -47,6 +47,7 @@ class ArticleDetail(ArticleSummary):
     """阅读页用，带上已分词的正文。"""
 
     source_url: str | None = None
+    source_name: str | None = None
     license: str
     redistributable: bool
     body_paragraphs: list[list[str]]
@@ -57,6 +58,7 @@ class ArticleImportText(ApiModel):
 
     title: str
     author: str | None = None
+    source_name: str | None = None
     text: str
     license: License = "copyrighted"
     redistributable: bool = False

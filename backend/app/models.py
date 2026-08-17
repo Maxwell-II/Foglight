@@ -83,6 +83,11 @@ class Article(Base):
     source_type: Mapped[str] = mapped_column(String(32))
     source_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
+    # 人类可读的出处，导出 Markdown 的「来源」行要用它。
+    # 例：书名 "Models: Attract Women Through Honesty"、站点名 "markmanson.net"。
+    # 没有它就只能拿 source_type 顶替，导出会变成"来源：epub"，很难看。
+    source_name: Mapped[str | None] = mapped_column(String(300), nullable=True)
+
     # —— 版权分层（docs/tech-plan.md §4.2）——
     # redistributable 决定这篇将来能不能公开给别人。必须逐篇标注，
     # 否则以后想开放服务时得回头人工审几百篇。
