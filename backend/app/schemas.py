@@ -53,6 +53,13 @@ class ArticleDetail(ArticleSummary):
     body_paragraphs: list[list[str]]
 
 
+class EpubImportCandidate(ApiModel):
+    """epub 上传但不传 titles 时的候选片段清单条目，不入库。"""
+
+    title: str
+    word_count: int
+
+
 class ArticleImportText(ApiModel):
     """粘贴正文导入。分词由后端做，客户端只给纯文本。"""
 

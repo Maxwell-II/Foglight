@@ -32,8 +32,9 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-# —— 路由挂载（等 P8 完成后接上）——
-# from app.routers import articles, marks, sessions
-# app.include_router(articles.router, prefix="/api")
-# app.include_router(sessions.router, prefix="/api")
-# app.include_router(marks.router, prefix="/api")
+# —— 路由挂载 ——
+from app.routers import articles, marks, sessions  # noqa: E402
+
+app.include_router(articles.router, prefix="/api")
+app.include_router(sessions.router, prefix="/api")
+app.include_router(marks.router, prefix="/api")
