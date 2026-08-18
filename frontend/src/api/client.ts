@@ -39,6 +39,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 // ---------- 后端响应形状（见 backend/app/schemas.py） ----------
 
+export type ArticleLevel = 'short' | 'medium' | 'long'
+
 export interface ArticleSummaryDto {
   id: number
   title: string
@@ -48,6 +50,8 @@ export interface ArticleSummaryDto {
   estMinutes: number
   topics: string[]
   difficulty: number | null
+  /** 篇幅档位，后端唯一计算（Article.level property）——前端只按返回值分组，不自己按 wordCount 判断。 */
+  level: ArticleLevel
   createdAt: string
 }
 
@@ -96,11 +100,26 @@ export interface MarkCreatePayload {
   context?: string
 }
 
+export type ParagraphMode = 'blank_line' | 'single_line'
+
 export interface ImportTextPayload {
   title: string
   author?: string
   sourceName?: string
   text: string
+  paragraphMode?: ParagraphMode
+}
+
+export interface PreviewTextPayload {
+  text: string
+  paragraphMode?: ParagraphMode
+}
+
+export interface ArticlePreviewDto {
+  paragraphCount: number
+  wordCount: number
+  level: ArticleLevel
+  firstParagraphs: string[]
 }
 
 // ---------- 请求函数 ----------
@@ -115,6 +134,11 @@ export function getArticle(id: number): Promise<ArticleDetailDto> {
 
 export function importText(payload: ImportTextPayload): Promise<ArticleDetailDto> {
   return request('/articles/import/text', { method: 'POST', body: JSON.stringify(payload) })
+}
+
+/** 预览分段结果，不入库。用于导入页的粘贴预览（防抖后调用）。 */
+export function previewText(payload: PreviewTextPayload): Promise<ArticlePreviewDto> {
+  return request('/articles/preview/text', { method: 'POST', body: JSON.stringify(payload) })
 }
 
 export function createSession(articleId: number): Promise<SessionDto> {

@@ -113,6 +113,16 @@ class Article(Base):
 
     sessions: Mapped[list["ReadingSession"]] = relationship(back_populates="article")
 
+    # 篇幅档位：word_count 的纯函数，不加数据库列（docs/work-packets-wave2.md §1.7）。
+    # 唯一实现——前端不许自己再算一遍，改阈值只改这一处，全库立刻生效。
+    @property
+    def level(self) -> str:
+        if self.word_count < 400:
+            return "short"
+        if self.word_count < 900:
+            return "medium"
+        return "long"
+
 
 class ReadingSession(Base):
     __tablename__ = "reading_sessions"

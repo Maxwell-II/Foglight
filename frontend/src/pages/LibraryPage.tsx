@@ -1,12 +1,42 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ApiError, createSession, listArticles, type ArticleSummaryDto } from '../api/client'
+import {
+  ApiError,
+  createSession,
+  listArticles,
+  type ArticleLevel,
+  type ArticleSummaryDto,
+} from '../api/client'
+
+const LEVEL_STORAGE_KEY = 'reading.libraryLevel'
+
+type LevelFilter = ArticleLevel | 'all'
+
+const LEVEL_LABELS: Record<LevelFilter, string> = {
+  short: '短文',
+  medium: '中等',
+  long: '长文',
+  all: '全部',
+}
+
+function readStoredLevel(): LevelFilter {
+  try {
+    const stored = localStorage.getItem(LEVEL_STORAGE_KEY)
+    if (stored === 'short' || stored === 'medium' || stored === 'long' || stored === 'all') {
+      return stored
+    }
+  } catch {
+    // localStorage 不可用（隐私模式等）时忽略，走默认值
+  }
+  return 'short'
+}
 
 export default function LibraryPage() {
   const navigate = useNavigate()
   const [articles, setArticles] = useState<ArticleSummaryDto[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [startingId, setStartingId] = useState<number | null>(null)
+  const [level, setLevel] = useState<LevelFilter>(readStoredLevel)
 
   useEffect(() => {
     let cancelled = false
@@ -21,6 +51,29 @@ export default function LibraryPage() {
       cancelled = true
     }
   }, [])
+
+  const selectLevel = (next: LevelFilter) => {
+    setLevel(next)
+    try {
+      localStorage.setItem(LEVEL_STORAGE_KEY, next)
+    } catch {
+      // 存不进去就算了，不影响本次会话内的筛选
+    }
+  }
+
+  const counts = useMemo(() => {
+    const base: Record<LevelFilter, number> = { short: 0, medium: 0, long: 0, all: 0 }
+    for (const a of articles ?? []) {
+      base[a.level] += 1
+      base.all += 1
+    }
+    return base
+  }, [articles])
+
+  const filtered = useMemo(() => {
+    if (!articles) return null
+    return level === 'all' ? articles : articles.filter((a) => a.level === level)
+  }, [articles, level])
 
   const startReading = async (articleId: number) => {
     setStartingId(articleId)
@@ -53,33 +106,56 @@ export default function LibraryPage() {
 
       {articles && articles.length > 0 && (
         <>
-          <p className="dim">共 {articles.length} 篇</p>
-          <ul className="article-grid">
-            {articles.map((a) => (
-              <li key={a.id} className="article-card">
-                <button
-                  className="article-card__button"
-                  disabled={startingId !== null}
-                  onClick={() => startReading(a.id)}
-                >
-                  <h2 className="article-card__title">{a.title}</h2>
-                  <div className="article-card__meta">
-                    {a.author ?? '佚名'} · {a.wordCount} 词 · 约 {a.estMinutes} 分钟
-                  </div>
-                  {a.topics.length > 0 && (
-                    <div className="article-card__topics">
-                      {a.topics.map((t) => (
-                        <span className="topic-chip" key={t}>
-                          {t}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {startingId === a.id && <div className="dim">开始阅读中…</div>}
-                </button>
-              </li>
+          <div className="level-tabs">
+            {(['short', 'medium', 'long', 'all'] as const).map((lv) => (
+              <button
+                key={lv}
+                type="button"
+                className={`level-tab${level === lv ? ' is-active' : ''}`}
+                onClick={() => selectLevel(lv)}
+              >
+                {LEVEL_LABELS[lv]} ({counts[lv]})
+              </button>
             ))}
-          </ul>
+          </div>
+
+          {filtered && filtered.length === 0 && level === 'short' && (
+            <p className="dim">
+              还没有短文，<Link to="/import">去导入一篇</Link>
+            </p>
+          )}
+          {filtered && filtered.length === 0 && level !== 'short' && (
+            <p className="dim">这个档位还没有文章。</p>
+          )}
+
+          {filtered && filtered.length > 0 && (
+            <ul className="article-grid">
+              {filtered.map((a) => (
+                <li key={a.id} className="article-card">
+                  <button
+                    className="article-card__button"
+                    disabled={startingId !== null}
+                    onClick={() => startReading(a.id)}
+                  >
+                    <h2 className="article-card__title">{a.title}</h2>
+                    <div className="article-card__meta">
+                      {a.author ?? '佚名'} · {a.wordCount} 词 · 约 {a.estMinutes} 分钟
+                    </div>
+                    {a.topics.length > 0 && (
+                      <div className="article-card__topics">
+                        {a.topics.map((t) => (
+                          <span className="topic-chip" key={t}>
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {startingId === a.id && <div className="dim">开始阅读中…</div>}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </>
       )}
     </div>

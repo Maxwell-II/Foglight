@@ -13,8 +13,16 @@ from sqlalchemy import or_
 
 from app.deps import CurrentUser, DbSession
 from app.models import Article, License, SourceType
-from app.schemas import ArticleDetail, ArticleImportText, ArticleSummary, EpubImportCandidate
+from app.schemas import (
+    ArticleDetail,
+    ArticleImportText,
+    ArticlePreviewRequest,
+    ArticlePreviewResponse,
+    ArticleSummary,
+    EpubImportCandidate,
+)
 from app.services.epub import parse_epub
+from app.services.normalize import normalize
 from app.services.tokenize import tokenize
 
 router = APIRouter(tags=["articles"])
@@ -48,9 +56,25 @@ def get_article(article_id: int, db: DbSession, user: CurrentUser) -> Article:
     return _get_visible_article(db, article_id, user.id)
 
 
+@router.post("/articles/preview/text", response_model=ArticlePreviewResponse)
+def preview_text(payload: ArticlePreviewRequest) -> ArticlePreviewResponse:
+    """粘贴导入前的预览：分段、计数、篇幅档位。不入库、不写数据库。"""
+    body_paragraphs = tokenize(normalize(payload.text, paragraph_mode=payload.paragraph_mode))
+    word_count = sum(len(p) for p in body_paragraphs)
+    # 借用 Article.level 这一个唯一实现（§1.7），不额外造一份阈值判断——
+    # 这个 Article 实例只在内存里算完这一次就丢弃，从不 add 进 session。
+    level = Article(word_count=word_count).level
+    return ArticlePreviewResponse(
+        paragraph_count=len(body_paragraphs),
+        word_count=word_count,
+        level=level,
+        first_paragraphs=[" ".join(p) for p in body_paragraphs[:3]],
+    )
+
+
 @router.post("/articles/import/text", response_model=ArticleDetail, status_code=201)
 def import_text(payload: ArticleImportText, db: DbSession, user: CurrentUser) -> Article:
-    body_paragraphs = tokenize(payload.text)
+    body_paragraphs = tokenize(normalize(payload.text, paragraph_mode=payload.paragraph_mode))
     word_count = sum(len(p) for p in body_paragraphs)
 
     article = Article(

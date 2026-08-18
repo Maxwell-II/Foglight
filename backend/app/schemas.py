@@ -8,12 +8,16 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 # 枚举的唯一权威在 models.py，这里直接复用，不重复定义
 from app.models import License, MarkType, SessionStatus
+
+# 篇幅档位的输入形状：段落间怎么切，唯一实现见 app.services.normalize
+ParagraphMode = Literal["blank_line", "single_line"]
 
 
 class ApiModel(BaseModel):
@@ -40,6 +44,8 @@ class ArticleSummary(ApiModel):
     est_minutes: int
     topics: list[str] = Field(default_factory=list)
     difficulty: float | None = None
+    # 篇幅档位（short/medium/long），来自 Article.level property（docs/work-packets-wave2.md §1.7）
+    level: str
     created_at: datetime
 
 
@@ -70,6 +76,30 @@ class ArticleImportText(ApiModel):
     license: License = "copyrighted"
     redistributable: bool = False
     topics: list[str] = Field(default_factory=list)
+    # 段落切分方式，见 app.services.normalize；默认按空行分段
+    paragraph_mode: ParagraphMode = "blank_line"
+
+
+class ArticlePreviewRequest(ApiModel):
+    """粘贴导入的预览请求。请求体同 ArticleImportText，但 title 可空——预览不落库，不需要标题。"""
+
+    title: str | None = None
+    author: str | None = None
+    source_name: str | None = None
+    text: str
+    license: License = "copyrighted"
+    redistributable: bool = False
+    topics: list[str] = Field(default_factory=list)
+    paragraph_mode: ParagraphMode = "blank_line"
+
+
+class ArticlePreviewResponse(ApiModel):
+    """粘贴导入的预览结果。不入库、不写数据库。"""
+
+    paragraph_count: int
+    word_count: int
+    level: str
+    first_paragraphs: list[str]
 
 
 # ---------- Mark ----------

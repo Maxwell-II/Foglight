@@ -1,6 +1,20 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ApiError, importText } from '../api/client'
+import {
+  ApiError,
+  importText,
+  previewText,
+  type ArticlePreviewDto,
+  type ParagraphMode,
+} from '../api/client'
+
+const LEVEL_LABELS: Record<ArticlePreviewDto['level'], string> = {
+  short: '短文',
+  medium: '中等',
+  long: '长文',
+}
+
+const PREVIEW_DEBOUNCE_MS = 400
 
 export default function ImportPage() {
   const navigate = useNavigate()
@@ -8,10 +22,40 @@ export default function ImportPage() {
   const [author, setAuthor] = useState('')
   const [sourceName, setSourceName] = useState('')
   const [text, setText] = useState('')
+  const [paragraphMode, setParagraphMode] = useState<ParagraphMode>('blank_line')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const wordCount = text.trim() === '' ? 0 : text.trim().split(/\s+/).length
+  const [preview, setPreview] = useState<ArticlePreviewDto | null>(null)
+  const [previewError, setPreviewError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (text.trim() === '') {
+      setPreview(null)
+      setPreviewError(null)
+      return
+    }
+    let cancelled = false
+    const timer = setTimeout(() => {
+      previewText({ text, paragraphMode })
+        .then((result) => {
+          if (!cancelled) {
+            setPreview(result)
+            setPreviewError(null)
+          }
+        })
+        .catch((err: unknown) => {
+          if (!cancelled) {
+            setPreview(null)
+            setPreviewError(err instanceof Error ? err.message : String(err))
+          }
+        })
+    }, PREVIEW_DEBOUNCE_MS)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [text, paragraphMode])
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -27,6 +71,7 @@ export default function ImportPage() {
         author: author.trim() || undefined,
         sourceName: sourceName.trim() || undefined,
         text,
+        paragraphMode,
       })
       navigate('/')
     } catch (err) {
@@ -63,7 +108,7 @@ export default function ImportPage() {
           />
         </label>
         <label className="field">
-          <span>正文 *（约 {wordCount} 词）</span>
+          <span>正文 *</span>
           <textarea
             className="import-text"
             value={text}
@@ -71,6 +116,33 @@ export default function ImportPage() {
             required
           />
         </label>
+
+        <label className="field field--checkbox">
+          <input
+            type="checkbox"
+            checked={paragraphMode === 'single_line'}
+            onChange={(e) => setParagraphMode(e.target.checked ? 'single_line' : 'blank_line')}
+          />
+          <span>每行单独成段（贴的是一句一行的短文时勾上）</span>
+        </label>
+
+        {previewError && <p className="dim">预览失败：{previewError}</p>}
+
+        {preview && (
+          <div className="import-preview">
+            <p className="import-preview__summary">
+              将分成 {preview.paragraphCount} 段 · 共 {preview.wordCount} 词 · 篇幅：
+              {LEVEL_LABELS[preview.level]}
+            </p>
+            {preview.firstParagraphs.length > 0 && (
+              <div className="import-preview__paragraphs">
+                {preview.firstParagraphs.map((p, i) => (
+                  <p key={i}>{p}</p>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {error && <p className="error-banner">{error}</p>}
 

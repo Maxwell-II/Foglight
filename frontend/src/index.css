@@ -262,3 +262,30 @@ kbd {
 }
 .sync-toast--error { background: #fff2f2; border: 1px solid var(--pink-edge); color: #a33; }
 .sync-toast--info { background: #f2f8ff; border: 1px solid var(--preview-edge); color: #2a5f96; }
+
+/* ---------- W1：篇幅档位标签 / 导入预览 ---------- */
+
+.level-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+.level-tabs .level-tab {
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--dim);
+}
+.level-tabs .level-tab.is-active { border-color: var(--ink); color: var(--ink); font-weight: 600; }
+
+.field--checkbox { flex-direction: row; align-items: center; gap: 8px; }
+.field--checkbox input { width: auto; }
+
+.import-preview {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 14px;
+  background: #fff;
+}
+.import-preview__summary { font-size: 13px; color: var(--dim); margin: 0 0 8px; }
+.import-preview__paragraphs { font-size: 14px; line-height: 1.7; }
+.import-preview__paragraphs p { margin: 0 0 8px; }
+.import-preview__paragraphs p:last-child { margin-bottom: 0; }
