@@ -14,3 +14,6 @@ __pycache__/
 
 # 版权内容，本地生成，不入库（见 README）
 frontend/src/sampleArticles.json
+
+# 粘贴导入的短文正文，来源不明确的版权文本，同上原则不入库（W2）
+seed/texts/

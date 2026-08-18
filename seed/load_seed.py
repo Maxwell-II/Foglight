@@ -1,16 +1,18 @@
-"""P10: read seed/manifest.json, drive the service layer, write articles to the DB.
+"""P10 / W2: read seed/manifest.json, drive the service layer, write articles to the DB.
 
 Reuses the already-verified pipeline instead of reimplementing any of it:
   app.services.epub.parse_epub          -- epub -> Segment list
   app.services.extract.fetch_article    -- URL -> Segment
   app.services.extract.split_by_headings -- long Segment -> Segment list
+  app.services.normalize.normalize      -- raw pasted-style text -> cleaned text
   app.services.tokenize.tokenize        -- plain text -> body_paragraphs
 
 Idempotent: rerunning must not create duplicate articles. Dedup key is
 (title, source_name) -- the human-readable origin ("Models: Attract Women
-Through Honesty", "markmanson.net"), which is stable even if the epub file
-moves on disk or a URL gains tracking params. source_url is still stored,
-but is not part of the identity.
+Through Honesty", "markmanson.net", "TikTok 短文"), which is stable even if
+the epub file moves on disk, a URL gains tracking params, or a text file
+gets renamed. source_url is still stored where it exists, but is not part
+of the identity.
 
 Console output is ASCII-only on purpose: this machine's terminal is GBK,
 and non-ASCII "decoration" characters have crashed scripts here before.
@@ -29,10 +31,13 @@ from sqlalchemy.orm import Session
 from app.models import Article, License, SourceType
 from app.services.epub import parse_epub
 from app.services.extract import FetchError, fetch_article, split_by_headings
+from app.services.normalize import normalize
 from app.services.segment import Segment
 from app.services.tokenize import tokenize
 
-DEFAULT_MANIFEST = Path(__file__).resolve().parent / "manifest.json"
+SEED_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SEED_DIR.parent
+DEFAULT_MANIFEST = SEED_DIR / "manifest.json"
 
 
 @dataclass
@@ -184,6 +189,127 @@ def _import_web_entry(
                 session.add(article)
 
 
+def _parse_text_file(path: Path) -> tuple[dict[str, str], str]:
+    """Minimal hand-rolled front-matter parser (docs/work-packets-wave2.md
+    W2 §2). No PyYAML: pyproject.toml is a contract file, no new deps
+    allowed for a seed script.
+
+        ---
+        title: The Best Gift a Parent Can Give
+        paragraph_mode: blank_line
+        topics: parenting, family
+        ---
+
+        Many parents spend their whole lives...
+
+    Returns (front_matter_dict, body_text). Raises ValueError if the file
+    doesn't open with a "---" line or the front matter is never closed.
+    """
+    lines = path.read_text(encoding="utf-8").split("\n")
+    if not lines or lines[0].strip() != "---":
+        raise ValueError("missing front matter (file must start with a '---' line)")
+    try:
+        closing = lines.index("---", 1)
+    except ValueError as exc:
+        raise ValueError("front matter never closed with a second '---' line") from exc
+
+    meta: dict[str, str] = {}
+    for line in lines[1:closing]:
+        if not line.strip() or ":" not in line:
+            continue
+        key, _, value = line.partition(":")
+        meta[key.strip()] = value.strip()
+
+    body = "\n".join(lines[closing + 1 :]).strip("\n")
+    return meta, body
+
+
+def _parse_bool(value: str | None, default: bool) -> bool:
+    if value is None:
+        return default
+    return value.strip().lower() in ("true", "1", "yes")
+
+
+def _import_text_entry(
+    entry: dict,
+    seen: set[tuple[str, str | None]],
+    session: Session,
+    stats: ImportStats,
+    dry_run: bool,
+) -> None:
+    text_dir = Path(entry["dir"])
+    if not text_dir.is_absolute():
+        # Manifest writes this as "seed/texts" -- relative to the repo root,
+        # not to whatever directory the script happens to be run from.
+        text_dir = REPO_ROOT / text_dir
+
+    if not text_dir.exists():
+        stats.warn(f"skip text source (dir not found): {text_dir}")
+        return
+
+    for path in sorted(text_dir.glob("*.md")):
+        try:
+            meta, body = _parse_text_file(path)
+        except ValueError as exc:
+            stats.failed += 1
+            stats.warn(f"skip text file (bad front matter): {path} ({exc})")
+            continue
+
+        title = meta.get("title", "").strip()
+        if not title:
+            stats.failed += 1
+            stats.warn(f"skip text file (missing title): {path}")
+            continue
+
+        if not body.strip():
+            stats.failed += 1
+            stats.warn(f"skip text file (empty body): {path}")
+            continue
+
+        source_name = meta.get("source_name", entry.get("source_name", ""))
+        key = (title, source_name)
+        if key in seen:
+            stats.skipped += 1
+            continue
+        seen.add(key)
+
+        # Every field falls back to the manifest entry's value when the
+        # per-file front matter doesn't declare it (work-packets-wave2.md
+        # W2 §2: "缺省字段回退到 manifest 里的条目级取值").
+        paragraph_mode = meta.get("paragraph_mode", "blank_line")
+        topics_raw = meta.get("topics")
+        topics = (
+            [t.strip() for t in topics_raw.split(",") if t.strip()]
+            if topics_raw
+            else list(entry.get("topics", []))
+        )
+
+        # tokenize() 是冻结的唯一实现；normalize() 是它的上游清洗步骤，
+        # 不许自己再写一份（work-packets-wave2.md W2 §2 第 3 点）。
+        body_paragraphs = tokenize(normalize(body, paragraph_mode=paragraph_mode))
+        word_count = sum(len(p) for p in body_paragraphs)
+
+        article = Article(
+            title=title,
+            author=meta.get("author", entry.get("author", "")) or None,
+            source_type=SourceType.CURATED,
+            source_url=None,
+            source_name=source_name,
+            license=meta.get("license", entry.get("license", License.COPYRIGHTED)),
+            redistributable=_parse_bool(
+                meta.get("redistributable"), bool(entry.get("redistributable", False))
+            ),
+            body_paragraphs=body_paragraphs,
+            word_count=word_count,
+            est_minutes=_est_minutes(word_count),
+            topics=topics,
+            created_by=None,
+        )
+        stats.added += 1
+        if not dry_run:
+            session.add(article)
+
+
 def load_manifest(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -200,6 +326,9 @@ def run(manifest_path: Path, session: Session, dry_run: bool = False) -> ImportS
 
     for entry in manifest.get("web_sources", []):
         _import_web_entry(entry, seen, session, stats, dry_run)
+
+    for entry in manifest.get("text_sources", []):
+        _import_text_entry(entry, seen, session, stats, dry_run)
 
     if not dry_run:
         session.commit()
