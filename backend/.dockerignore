@@ -1,0 +1,13 @@
+tests/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.venv/
+.env
+
+# 本机数据库含版权正文，绝不能烤进镜像；数据来自挂载卷（/data），不是镜像内容。
+*.db*
+
+.git/
+.gitignore

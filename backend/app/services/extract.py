@@ -34,10 +34,16 @@ _NOISE_TITLES = {
 
 # 订阅/推广/分享类容器的 class 名特征：这类块不管标题是否命中黑名单，
 # 结构上就不是正文，直接整块剔除。
+# previous-post / next-post：博客文章间导航（实测 zenhabits.net），标题读起来
+# 像正文但其实是"上一篇/下一篇"链接块。
 _NOISE_CLASS_RE = re.compile(
-    r"opt-in|promo|newsletter|subscribe|sharedaddy|share-btn|social-share",
+    r"opt-in|promo|newsletter|subscribe|sharedaddy|share-btn|social-share"
+    r"|previous-post|next-post",
     re.IGNORECASE,
 )
+
+# 正文提取的目标标签：小标题（不含 h1，h1 只作标题用）+ 段落 + 列表项。
+_PARAGRAPH_TAGS = _BODY_HEADING_TAGS + ("p", "li")
 
 _USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -91,10 +97,14 @@ def fetch_article(url: str) -> Segment:
         raise FetchError(f"未能提取标题：{url}")
 
     headings = scope.find_all(["h2", "h3"])
-    if not headings:
-        raise FetchError(f"未找到正文结构（无 h2/h3 小标题）：{url}")
+    if headings:
+        # 已验证过的行为，一点不能变：多个小标题的公共祖先当正文容器。
+        container = _common_ancestor(headings)
+    else:
+        # 短文按定义就没有小标题——正因为没有小标题它才短。回退到 readability
+        # 的通用正文提取，不再把"没有 h2/h3"当成失败。
+        container = _fallback_container(html, url)
 
-    container = _common_ancestor(headings)
     _strip_noise(container)
 
     paragraphs = _extract_paragraphs(container)
@@ -156,6 +166,20 @@ def _normalize_heading(text: str) -> str:
     return text
 
 
+def _fallback_container(html: str, url: str) -> Tag:
+    """无 h2/h3 时的正文容器：readability 通用正文提取。
+
+    只在没有小标题时才用——有 h2/h3 时必须走 _common_ancestor，那条路径的
+    输出是回归底线，不能受这条新路径影响。
+    """
+    try:
+        summary_html = Document(html).summary()
+    except Exception as exc:  # readability 对畸形页面可能抛各种异常
+        raise FetchError(f"正文提取失败：{url}（{exc}）") from exc
+    summary_soup = BeautifulSoup(summary_html, "lxml")
+    return summary_soup.body or summary_soup
+
+
 def _common_ancestor(nodes: list[Tag]) -> Tag:
     chains: list[list[Tag]] = []
     for node in nodes:
@@ -204,9 +228,26 @@ def _strip_noise(container: Tag) -> None:
 
 
 def _extract_paragraphs(container: Tag) -> list[str]:
+    # 有些站点（如 sive.rs）一句一行，但行与行之间只用 <br> 或裸换行分隔，
+    # 都写在同一个 <p> 里。<br> 先换成真实换行符，这样两种写法统一处理。
+    for br in container.find_all("br"):
+        br.replace_with("\n")
+
     paragraphs: list[str] = []
-    for el in container.find_all(list(_BODY_HEADING_TAGS) + ["p", "li"]):
-        text = " ".join(el.get_text(" ", strip=True).split())
-        if text:
-            paragraphs.append(text)
+    for el in container.find_all(_PARAGRAPH_TAGS):
+        # <li><p>...</p></li> 这类嵌套会让外层和内层各输出一次、内容重复
+        # （实测 zenhabits.net 触发，800-900 词的正文被算成 1668）。
+        # 命中嵌套时跳过外层，只留最内层的匹配来产出文本。
+        if el.find(_PARAGRAPH_TAGS):
+            continue
+
+        # strip=False：strip=True 会把纯空白的 NavigableString 整个丢弃，
+        # 而 <br> 换出来的那个 "\n" 就是纯空白字符串——用 strip=True 的话，
+        # 换行标记在这里就被吃掉了，spliting 根本看不到它。空白规整化
+        # 放在下面按行切开之后做，效果一样，不会漏行。
+        raw = el.get_text(" ", strip=False)
+        for line in raw.splitlines():
+            text = " ".join(line.split())
+            if text:
+                paragraphs.append(text)
     return paragraphs
