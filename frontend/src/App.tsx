@@ -3,6 +3,7 @@ import LibraryPage from './pages/LibraryPage'
 import ImportPage from './pages/ImportPage'
 import ReaderPage from './pages/ReaderPage'
 import ReviewPage from './pages/ReviewPage'
+import ThemeToggle from './components/ThemeToggle'
 
 function NotFound() {
   return (
@@ -16,6 +17,7 @@ function NotFound() {
 export default function App() {
   return (
     <BrowserRouter>
+      <ThemeToggle />
       <Routes>
         <Route path="/" element={<LibraryPage />} />
         <Route path="/import" element={<ImportPage />} />

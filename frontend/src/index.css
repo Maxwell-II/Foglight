@@ -9,6 +9,62 @@
   --pink-edge: #d9706f;
   --preview: #cfe4ff;
   --preview-edge: #5b9bd5;
+
+  /* ---- W3：补的 token，亮色值和原来的硬编码逐像素一致 ---- */
+  --surface: #fff;
+  --toolbar-bg: rgba(250, 248, 244, 0.95);
+  --pink-wash: #fff2f2;
+  --btn-fg: #fff;
+  --danger-bg: #fff2f2;
+  --danger-fg: #a33;
+  --info-bg: #f2f8ff;
+  --info-fg: #2a5f96;
+}
+
+/* system 主题下跟随操作系统；data-theme="light" 显式覆盖时不应用这一块 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #17161a;
+    --ink: #e6e2da;
+    --dim: #8d8880;
+    --line: #2f2d33;
+    --surface: #201f24;
+    --toolbar-bg: rgba(32, 31, 36, 0.95);
+    --yellow: rgba(255, 209, 102, 0.2);
+    --yellow-edge: #c8942f;
+    --pink: rgba(255, 138, 138, 0.2);
+    --pink-edge: #c0605f;
+    --preview: rgba(91, 155, 213, 0.22);
+    --preview-edge: #5b9bd5;
+    --pink-wash: #2a1f22;
+    --btn-fg: #17161a;
+    --danger-bg: #2a1f22;
+    --danger-fg: #e0908f;
+    --info-bg: #1c2733;
+    --info-fg: #8ec2f0;
+  }
+}
+
+/* data-theme="dark" 显式选择时生效，无论系统设置如何；内容和上面那块逐条一致 */
+[data-theme='dark'] {
+  --bg: #17161a;
+  --ink: #e6e2da;
+  --dim: #8d8880;
+  --line: #2f2d33;
+  --surface: #201f24;
+  --toolbar-bg: rgba(32, 31, 36, 0.95);
+  --yellow: rgba(255, 209, 102, 0.2);
+  --yellow-edge: #c8942f;
+  --pink: rgba(255, 138, 138, 0.2);
+  --pink-edge: #c0605f;
+  --preview: rgba(91, 155, 213, 0.22);
+  --preview-edge: #5b9bd5;
+  --pink-wash: #2a1f22;
+  --btn-fg: #17161a;
+  --danger-bg: #2a1f22;
+  --danger-fg: #e0908f;
+  --info-bg: #1c2733;
+  --info-fg: #8ec2f0;
 }
 
 * { box-sizing: border-box; }
@@ -31,14 +87,14 @@ button { font-family: inherit; cursor: pointer; }
   align-items: center;
   gap: 20px;
   padding: 10px 24px;
-  background: rgba(250, 248, 244, 0.95);
+  background: var(--toolbar-bg);
   backdrop-filter: blur(6px);
   border-bottom: 2px solid var(--line);
   transition: border-color 0.15s;
 }
 /* 进入范围模式时整条工具栏变色 —— 让"现在是什么模式"一眼可见 */
 .toolbar--pink { border-bottom-color: var(--pink-edge); }
-.toolbar.is-extending { background: #fff2f2; }
+.toolbar.is-extending { background: var(--pink-wash); }
 
 .pens { display: flex; gap: 8px; }
 .pen {
@@ -49,7 +105,7 @@ button { font-family: inherit; cursor: pointer; }
   padding: 6px 12px;
   border-radius: 20px;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
   color: var(--dim);
 }
 .pen.is-active { color: var(--ink); border-color: var(--ink); font-weight: 600; }
@@ -72,7 +128,7 @@ kbd {
 .btn-primary {
   border: 1px solid var(--ink);
   background: var(--ink);
-  color: #fff;
+  color: var(--btn-fg);
   font-size: 14px;
   padding: 8px 16px;
   border-radius: 6px;
@@ -87,7 +143,7 @@ kbd {
   padding: 5px 10px;
   border-radius: 14px;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
   color: var(--dim);
 }
 .picker button.is-active { border-color: var(--ink); color: var(--ink); }
@@ -141,7 +197,7 @@ kbd {
 .mark-list { list-style: none; padding: 0; margin: 0; }
 .mark-list li {
   font-size: 14px;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 8px 12px;
@@ -179,9 +235,9 @@ kbd {
 .back-link:hover { color: var(--ink); }
 
 .error-banner {
-  background: #fff2f2;
+  background: var(--danger-bg);
   border: 1px solid var(--pink-edge);
-  color: #a33;
+  color: var(--danger-fg);
   font-size: 13px;
   padding: 10px 14px;
   border-radius: 6px;
@@ -210,7 +266,7 @@ kbd {
 .article-card__button {
   width: 100%;
   text-align: left;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 14px 16px;
@@ -245,7 +301,7 @@ kbd {
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 8px 10px;
-  background: #fff;
+  background: var(--surface);
 }
 .import-text { min-height: 320px; line-height: 1.6; resize: vertical; }
 
@@ -260,8 +316,8 @@ kbd {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   max-width: 320px;
 }
-.sync-toast--error { background: #fff2f2; border: 1px solid var(--pink-edge); color: #a33; }
-.sync-toast--info { background: #f2f8ff; border: 1px solid var(--preview-edge); color: #2a5f96; }
+.sync-toast--error { background: var(--danger-bg); border: 1px solid var(--pink-edge); color: var(--danger-fg); }
+.sync-toast--info { background: var(--info-bg); border: 1px solid var(--preview-edge); color: var(--info-fg); }
 
 /* ---------- W1：篇幅档位标签 / 导入预览 ---------- */
 
@@ -271,7 +327,7 @@ kbd {
   padding: 6px 14px;
   border-radius: 16px;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
   color: var(--dim);
 }
 .level-tabs .level-tab.is-active { border-color: var(--ink); color: var(--ink); font-weight: 600; }
@@ -283,9 +339,30 @@ kbd {
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 10px 14px;
-  background: #fff;
+  background: var(--surface);
 }
 .import-preview__summary { font-size: 13px; color: var(--dim); margin: 0 0 8px; }
 .import-preview__paragraphs { font-size: 14px; line-height: 1.7; }
 .import-preview__paragraphs p { margin: 0 0 8px; }
 .import-preview__paragraphs p:last-child { margin-bottom: 0; }
+
+/* ---------- W3：主题切换按钮 ---------- */
+
+.theme-toggle {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 30;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1;
+}
+.theme-toggle:hover { border-color: var(--ink); }
