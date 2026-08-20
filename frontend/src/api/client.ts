@@ -52,6 +52,8 @@ export interface ArticleSummaryDto {
   difficulty: number | null
   /** 篇幅档位，后端唯一计算（Article.level property）——前端只按返回值分组，不自己按 wordCount 判断。 */
   level: ArticleLevel
+  /** 读完过没有（存在任一 finished 会话）。后端唯一计算，前端不碰会话表。 */
+  isRead: boolean
   createdAt: string
 }
 

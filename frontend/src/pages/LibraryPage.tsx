@@ -133,12 +133,13 @@ export default function LibraryPage() {
               {filtered.map((a) => (
                 <li key={a.id} className="article-card">
                   <button
-                    className="article-card__button"
+                    className={`article-card__button${a.isRead ? ' is-read' : ''}`}
                     disabled={startingId !== null}
                     onClick={() => startReading(a.id)}
                   >
                     <h2 className="article-card__title">{a.title}</h2>
                     <div className="article-card__meta">
+                      {a.isRead && <span className="read-badge">已读</span>}
                       {a.author ?? '佚名'} · {a.wordCount} 词 · 约 {a.estMinutes} 分钟
                     </div>
                     {a.topics.length > 0 && (

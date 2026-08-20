@@ -46,6 +46,10 @@ class ArticleSummary(ApiModel):
     difficulty: float | None = None
     # 篇幅档位（short/medium/long），来自 Article.level property（docs/work-packets-wave2.md §1.7）
     level: str
+    # 读完状态：这个用户在这篇上有没有过 finished 会话。
+    # 派生值，不是数据库列 —— 由 routers/articles.py 的 _attach_read_state 挂到实例上。
+    # 默认 False 是给「刚导入的文章」和「不走列表的单篇响应」兜底，不是业务默认值。
+    is_read: bool = False
     created_at: datetime
 
 

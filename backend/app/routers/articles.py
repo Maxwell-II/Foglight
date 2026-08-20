@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import or_
 
 from app.deps import CurrentUser, DbSession
-from app.models import Article, License, SourceType
+from app.models import Article, License, ReadingSession, SessionStatus, SourceType
 from app.schemas import (
     ArticleDetail,
     ArticleImportText,
@@ -33,6 +33,35 @@ def _est_minutes(word_count: int) -> int:
     return max(1, round(word_count / 200))
 
 
+def _attach_read_state(db: DbSession, articles: list[Article], user_id: int) -> list[Article]:
+    """给每篇挂上 is_read（这个用户读完过没有），供 ArticleSummary 读取。
+
+    不加数据库列 —— 和 level 同一条理由（§1.7）：它是会话表的派生值，加列就多一个
+    会和事实漂移的冗余字段。也不用 Article.sessions relationship 逐篇判断，那是 N+1：
+    列表 84 篇会打 84 次查询。这里一次 IN 聚合查完。
+
+    只认 FINISHED。abandoned 是「点开了没读完」，不是读完 —— 这和 sessions.py 里
+    _FINISHED_STATUSES 把两者并列的口径不同，那里问的是「会话结束了吗」，
+    这里问的是「他读完了吗」，是两个问题。
+    """
+    if not articles:
+        return articles
+
+    read_ids = {
+        row[0]
+        for row in db.query(ReadingSession.article_id)
+        .filter(
+            ReadingSession.user_id == user_id,
+            ReadingSession.status == SessionStatus.FINISHED,
+            ReadingSession.article_id.in_([a.id for a in articles]),
+        )
+        .distinct()
+    }
+    for article in articles:
+        article.is_read = article.id in read_ids
+    return articles
+
+
 def _get_visible_article(db: DbSession, article_id: int, user_id: int) -> Article:
     """curated（created_by 为空）对所有人可见；用户自己导入的只对自己可见。"""
     article = db.get(Article, article_id)
@@ -43,17 +72,19 @@ def _get_visible_article(db: DbSession, article_id: int, user_id: int) -> Articl
 
 @router.get("/articles", response_model=list[ArticleSummary])
 def list_articles(db: DbSession, user: CurrentUser) -> list[Article]:
-    return (
+    articles = (
         db.query(Article)
         .filter(or_(Article.created_by.is_(None), Article.created_by == user.id))
         .order_by(Article.created_at.desc())
         .all()
     )
+    return _attach_read_state(db, articles, user.id)
 
 
 @router.get("/articles/{article_id}", response_model=ArticleDetail)
 def get_article(article_id: int, db: DbSession, user: CurrentUser) -> Article:
-    return _get_visible_article(db, article_id, user.id)
+    article = _get_visible_article(db, article_id, user.id)
+    return _attach_read_state(db, [article], user.id)[0]
 
 
 @router.post("/articles/preview/text", response_model=ArticlePreviewResponse)
