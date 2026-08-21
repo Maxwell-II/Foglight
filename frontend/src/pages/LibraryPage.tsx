@@ -75,11 +75,18 @@ export default function LibraryPage() {
     return level === 'all' ? articles : articles.filter((a) => a.level === level)
   }, [articles, level])
 
-  const startReading = async (articleId: number) => {
-    setStartingId(articleId)
+  const startReading = async (article: ArticleSummaryDto) => {
+    // 有未完成的会话就回到它。不复用的话每点一次就开一个空会话，
+    // 上一次标的东西被孤立在旧会话里，界面上看起来就是「标记没了」。
+    if (article.resumeSessionId !== null) {
+      navigate(`/read/${article.resumeSessionId}`)
+      return
+    }
+
+    setStartingId(article.id)
     setError(null)
     try {
-      const session = await createSession(articleId)
+      const session = await createSession(article.id)
       navigate(`/read/${session.id}`)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '开始阅读失败，请重试。')
@@ -135,11 +142,12 @@ export default function LibraryPage() {
                   <button
                     className={`article-card__button${a.isRead ? ' is-read' : ''}`}
                     disabled={startingId !== null}
-                    onClick={() => startReading(a.id)}
+                    onClick={() => startReading(a)}
                   >
                     <h2 className="article-card__title">{a.title}</h2>
                     <div className="article-card__meta">
                       {a.isRead && <span className="read-badge">已读</span>}
+                      {a.resumeSessionId !== null && <span className="read-badge">读到一半</span>}
                       {a.author ?? '佚名'} · {a.wordCount} 词 · 约 {a.estMinutes} 分钟
                     </div>
                     {a.topics.length > 0 && (
@@ -153,6 +161,12 @@ export default function LibraryPage() {
                     )}
                     {startingId === a.id && <div className="dim">开始阅读中…</div>}
                   </button>
+                  {/* 必须放在 button 外面：HTML 不允许 button 里再嵌可交互元素 */}
+                  {a.lastMarksSessionId !== null && (
+                    <Link className="article-card__marks" to={`/review/${a.lastMarksSessionId}`}>
+                      上次标了 {a.lastMarksCount} 处 →
+                    </Link>
+                  )}
                 </li>
               ))}
             </ul>

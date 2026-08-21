@@ -9,10 +9,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 
 from app.deps import CurrentUser, DbSession
-from app.models import Article, License, ReadingSession, SessionStatus, SourceType
+from app.models import Article, License, Mark, ReadingSession, SessionStatus, SourceType
 from app.schemas import (
     ArticleDetail,
     ArticleImportText,
@@ -33,32 +33,72 @@ def _est_minutes(word_count: int) -> int:
     return max(1, round(word_count / 200))
 
 
-def _attach_read_state(db: DbSession, articles: list[Article], user_id: int) -> list[Article]:
-    """给每篇挂上 is_read（这个用户读完过没有），供 ArticleSummary 读取。
+def _attach_session_state(db: DbSession, articles: list[Article], user_id: int) -> list[Article]:
+    """给每篇挂上「这个用户在它上面留下过什么」，供 ArticleSummary 读取。
 
-    不加数据库列 —— 和 level 同一条理由（§1.7）：它是会话表的派生值，加列就多一个
-    会和事实漂移的冗余字段。也不用 Article.sessions relationship 逐篇判断，那是 N+1：
-    列表 84 篇会打 84 次查询。这里一次 IN 聚合查完。
+    挂四个派生值：
+      is_read              读完过没有（存在 finished 会话）
+      resume_session_id    最近一个未完成**且有进度**的会话（标过东西或滚动过）。
+                           「有进度」这个限定是必须的：点开两秒就退出也会留下一个
+                           未完成会话，把它当成「读到一半」是假信息 —— 他没读到一半，
+                           只是瞄了一眼。空会话一律当不存在，重新点开等于重新开始
+      last_marks_session_id / last_marks_count
+                           最近一个「标过东西」的会话及其标记数，不论读完没读完。
+                           这是回到上一次标记的唯一入口。marks 挂在 session 上
+                           是 models.py 的既定设计（重读是新的一组），但那个设计
+                           一直缺一个「回到上一次」的口子，缺口就表现为「标记没了」。
 
-    只认 FINISHED。abandoned 是「点开了没读完」，不是读完 —— 这和 sessions.py 里
-    _FINISHED_STATUSES 把两者并列的口径不同，那里问的是「会话结束了吗」，
-    这里问的是「他读完了吗」，是两个问题。
+    都不加数据库列 —— 和 level 同一条理由（§1.7）：会话表的派生值，加列就多一个
+    会和事实漂移的冗余字段。也不用 relationship 逐篇查，那是 N+1（84 篇打 84 次）。
+    下面是**一条** SQL：会话左连标记、按会话聚合，Python 侧再按文章归并。
+
+    is_read 只认 FINISHED。abandoned 是「点开了没读完」，不是读完 —— 这和 sessions.py
+    里 _FINISHED_STATUSES 把两者并列的口径不同：那里问「会话结束了吗」，
+    这里问「他读完了吗」，是两个问题。
     """
     if not articles:
         return articles
 
-    read_ids = {
-        row[0]
-        for row in db.query(ReadingSession.article_id)
+    rows = (
+        db.query(
+            ReadingSession.article_id,
+            ReadingSession.id,
+            ReadingSession.status,
+            ReadingSession.scroll_position,
+            func.count(Mark.id),
+        )
+        .outerjoin(Mark, Mark.session_id == ReadingSession.id)
         .filter(
             ReadingSession.user_id == user_id,
-            ReadingSession.status == SessionStatus.FINISHED,
             ReadingSession.article_id.in_([a.id for a in articles]),
         )
-        .distinct()
-    }
+        .group_by(ReadingSession.id)
+        .order_by(ReadingSession.id)
+        .all()
+    )
+
+    # 按 id 升序扫一遍，后面的覆盖前面的 —— 于是每个槽位留下的都是「最近的那个」。
+    # 用自增 id 而不是 started_at 排序：同一秒里连点两下，时间戳分不出先后。
+    state: dict[int, dict] = {}
+    for article_id, session_id, status, scroll_position, mark_count in rows:
+        slot = state.setdefault(
+            article_id,
+            {"is_read": False, "resume": None, "marks_session": None, "marks_count": 0},
+        )
+        if status == SessionStatus.FINISHED:
+            slot["is_read"] = True
+        if status == SessionStatus.READING and (mark_count > 0 or scroll_position > 0):
+            slot["resume"] = session_id
+        if mark_count > 0:
+            slot["marks_session"] = session_id
+            slot["marks_count"] = mark_count
+
     for article in articles:
-        article.is_read = article.id in read_ids
+        slot = state.get(article.id)
+        article.is_read = bool(slot and slot["is_read"])
+        article.resume_session_id = slot["resume"] if slot else None
+        article.last_marks_session_id = slot["marks_session"] if slot else None
+        article.last_marks_count = slot["marks_count"] if slot else 0
     return articles
 
 
@@ -78,13 +118,13 @@ def list_articles(db: DbSession, user: CurrentUser) -> list[Article]:
         .order_by(Article.created_at.desc())
         .all()
     )
-    return _attach_read_state(db, articles, user.id)
+    return _attach_session_state(db, articles, user.id)
 
 
 @router.get("/articles/{article_id}", response_model=ArticleDetail)
 def get_article(article_id: int, db: DbSession, user: CurrentUser) -> Article:
     article = _get_visible_article(db, article_id, user.id)
-    return _attach_read_state(db, [article], user.id)[0]
+    return _attach_session_state(db, [article], user.id)[0]
 
 
 @router.post("/articles/preview/text", response_model=ArticlePreviewResponse)

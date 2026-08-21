@@ -46,10 +46,18 @@ class ArticleSummary(ApiModel):
     difficulty: float | None = None
     # 篇幅档位（short/medium/long），来自 Article.level property（docs/work-packets-wave2.md §1.7）
     level: str
-    # 读完状态：这个用户在这篇上有没有过 finished 会话。
-    # 派生值，不是数据库列 —— 由 routers/articles.py 的 _attach_read_state 挂到实例上。
-    # 默认 False 是给「刚导入的文章」和「不走列表的单篇响应」兜底，不是业务默认值。
+    # 下面四个都是会话表的派生值，不是数据库列 ——
+    # 由 routers/articles.py 的 _attach_session_state 一条 SQL 算完后挂到实例上。
+    # 默认值是给「刚导入的文章」兜底（它还没有任何会话），不是业务默认值。
+    #
+    # 读完过没有（存在 finished 会话）
     is_read: bool = False
+    # 最近一个未完成会话。前端有它就直接进去续读，不再新建 ——
+    # 每点一次就新建的话，上一次的标记会被孤立、再也回不去（这就是「标记没了」的成因）
+    resume_session_id: int | None = None
+    # 最近一个标过东西的会话及其标记数。这是回到上一次标记的唯一入口
+    last_marks_session_id: int | None = None
+    last_marks_count: int = 0
     created_at: datetime
 
 

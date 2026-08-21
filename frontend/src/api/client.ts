@@ -54,6 +54,12 @@ export interface ArticleSummaryDto {
   level: ArticleLevel
   /** 读完过没有（存在任一 finished 会话）。后端唯一计算，前端不碰会话表。 */
   isRead: boolean
+  /** 最近一个未完成会话。有它就直接进去续读，**不要再新建** ——
+   *  每点一次新建一个的话，上一次的标记会被孤立、再也回不去。 */
+  resumeSessionId: number | null
+  /** 最近一个标过东西的会话，以及标记数。回到上一次标记的唯一入口。 */
+  lastMarksSessionId: number | null
+  lastMarksCount: number
   createdAt: string
 }
 

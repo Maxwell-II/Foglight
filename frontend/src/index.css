@@ -292,6 +292,18 @@ kbd {
    hover 恢复满色，重读时不至于要在灰卡上找字。 */
 .article-card__button.is-read { opacity: 0.55; }
 .article-card__button.is-read:hover { opacity: 1; }
+/* 回到上一次标记的入口。在卡片按钮之外，所以已读卡片压暗时它不跟着暗 —— 
+   它恰恰是已读卡片上最该点的东西。 */
+.article-card__marks {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 2px;
+  font-size: 12px;
+  color: var(--pink-edge);
+  text-decoration: none;
+}
+.article-card__marks:hover { text-decoration: underline; }
+
 .read-badge {
   display: inline-block;
   margin-right: 6px;
