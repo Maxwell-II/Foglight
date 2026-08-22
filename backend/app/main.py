@@ -33,8 +33,12 @@ def health() -> dict[str, str]:
 
 
 # —— 路由挂载 ——
-from app.routers import articles, marks, sessions  # noqa: E402
+from app.routers import articles, auth, books, marks, sessions  # noqa: E402
 
 app.include_router(articles.router, prefix="/api")
 app.include_router(sessions.router, prefix="/api")
 app.include_router(marks.router, prefix="/api")
+# Wave 3：两个空壳已经挂好，books.py 和 auth.py 由各自的任务包填内容。
+# 这样 main.py 就不再是两条线的共享文件 —— 谁都不用改它。
+app.include_router(books.router, prefix="/api")
+app.include_router(auth.router, prefix="/api")
