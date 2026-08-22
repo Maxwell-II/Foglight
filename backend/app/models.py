@@ -70,7 +70,63 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
+    # —— 凭据（Wave 3 §1.12）——
+    # 两者都可空：id=1 这个用户在建号之前就是空的，不可空会让迁移直接失败。
+    # ⚠️ 建号是给 id=1 补上这两列，不是新建用户 —— 全部历史会话和标记都挂在 id=1，
+    #    新建一个 id=2 登进去，他的标记会全部变成看不见的孤儿数据。
+    email: Mapped[str | None] = mapped_column(String(320), unique=True, nullable=True)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    # —— 登录限流（Wave 3 §A1）。按账号锁，不按 IP：单用户应用按 IP 只会在换网络时误伤自己 ——
+    failed_login_count: Mapped[int] = mapped_column(Integer, default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     sessions: Mapped[list["ReadingSession"]] = relationship(back_populates="user")
+    auth_sessions: Mapped[list["AuthSession"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class Book(Base):
+    """一本书 = 章节的有序编组（Wave 3 §1.9）。
+
+    章节**就是 Article** —— 章节需要的一切（分词正文、词数、档位、会话、标记、
+    导出）Article 全都有。新建一张 chapters 表等于把这些逐个复制一遍，正是
+    Wave 1 最贵的教训（同一个概念存两份，字段一样但会静默错开）。
+
+    为什么不靠 source_name 分组：那是人类可读的出处字符串，改一个字就散架，
+    而且挂不了书级的版权字段和归属。库里那 10 章 Models 恰好靠它分在一起，
+    那是巧合不是结构。
+    """
+
+    __tablename__ = "books"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(500))
+    author: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+    # 和 Article 同一套版权分层（tech-plan.md §4.2）。书几乎必然是 A 层。
+    license: Mapped[str] = mapped_column(String(64))
+    redistributable: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    created_by: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    # passive_deletes=True 不是可选项：没有它，SQLAlchemy 在 session.delete(book)
+    # 时会先把子行的 book_id 置空，于是「走 ORM 删」和「走 SQL 删」结果不同 ——
+    # 前者留下一堆 book_id=NULL 的孤儿章涌进短文库，后者按数据库的 CASCADE 删掉。
+    # 加上它之后交给数据库处理，两条路径一致（app/db.py 每条连接都开了 foreign_keys=ON）。
+    #
+    # ⚠️ 代价要知道：删书会连章节一起删，而章节又 CASCADE 到 reading_sessions 和
+    #    marks —— 也就是删一本书会销毁这本书上的全部标记。正因如此，Wave 3
+    #    **不提供删除书的接口**，这条路径目前只可能被人工 SQL 触发。
+    chapters: Mapped[list["Article"]] = relationship(
+        back_populates="book", order_by="Article.order_index", passive_deletes=True
+    )
 
 
 class Article(Base):
@@ -110,6 +166,17 @@ class Article(Base):
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    # —— 书内归属（Wave 3 §1.9）。散篇文章两个都是 NULL ——
+    # 删书时章节一起删：书没了，留着孤儿章没有意义。
+    book_id: Mapped[int | None] = mapped_column(
+        ForeignKey("books.id", ondelete="CASCADE"), nullable=True
+    )
+    # ⚠️ 书内顺序的唯一权威（§1.10）。任何地方要按书内顺序排一律用它，
+    #    禁止拿 id 或 created_at 代替 —— 那两个只是碰巧接近，不是顺序。
+    order_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    book: Mapped["Book | None"] = relationship(back_populates="chapters")
 
     sessions: Mapped[list["ReadingSession"]] = relationship(back_populates="article")
 
@@ -177,3 +244,45 @@ class Mark(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
     session: Mapped["ReadingSession"] = relationship(back_populates="marks")
+
+
+class AuthSession(Base):
+    """登录会话（Wave 3 §1.13）。
+
+    为什么是数据库支持而不是 JWT：单机单库、需要「退出登录立刻失效」、
+    没有跨服务需求。JWT 在这三条下只带来坏处 —— 改密码后旧令牌仍有效，
+    真想撤销还是得建一张这样的表。
+
+    ⚠️ 和 ReadingSession 是两回事，名字像但完全无关：
+       ReadingSession = 一次阅读；AuthSession = 一次登录。
+    """
+
+    __tablename__ = "auth_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+
+    # 存 sha256 摘要，不存明文令牌 —— db 文件会被 deploy/backup.sh 备份到
+    # /var/backups 并保留 7 份，明文令牌进备份等于把登录态泄漏面扩大到所有历史备份。
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    user: Mapped["User"] = relationship(back_populates="auth_sessions")
+
+
+class CaptchaChallenge(Base):
+    """一次验证码挑战（Wave 3 §A1）。
+
+    答案存明文是刻意的：它 5 分钟过期、一次性作废，泄漏它的价值等于零。
+    哈希它只会让代码看起来更「安全」而不增加任何实际防护 ——
+    这种装饰性加密会让人误以为整套东西比实际更结实。
+    """
+
+    __tablename__ = "captcha_challenges"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    answer: Mapped[str] = mapped_column(String(16))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used: Mapped[bool] = mapped_column(Boolean, default=False)

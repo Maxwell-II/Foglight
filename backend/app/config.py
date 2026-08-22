@@ -24,5 +24,12 @@ class Settings(BaseSettings):
     # 允许跨域的前端地址（开发时 Vite 跑在 5173）
     cors_origins: list[str] = ["http://localhost:5173"]
 
+    # —— 登录会话（Wave 3 §1.13）——
+    # ⚠️ 本地开发跑在 http，写死 True 会让 cookie 根本发不出去，而且浏览器
+    #    不会报任何错，症状是"登录返回 200 但下一个请求就 401"，极难判断。
+    #    线上由 deploy/docker-compose.yml 注入 SESSION_COOKIE_SECURE=true。
+    session_cookie_secure: bool = False
+    session_ttl_days: int = 30
+
 
 settings = Settings()

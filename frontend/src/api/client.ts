@@ -27,6 +27,9 @@ export class ApiError extends Error {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const resp = await fetch(`${BASE}${path}`, {
     ...init,
+    // 登录会话是 HttpOnly cookie（Wave 3 §1.13）。不带这个，cookie 不会被发出去，
+    // 症状是"登录返回 200 但每个接口都 401"。
+    credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
   })
   if (!resp.ok) {
@@ -166,7 +169,10 @@ export function updateSession(
 
 /** 纯文本 Markdown，不是 JSON —— 不走 request()，直接 fetch。 */
 export async function exportSession(id: number): Promise<string> {
-  const resp = await fetch(`${BASE}/sessions/${id}/export`)
+  // ⚠️ 这是文件里第二处 fetch。只给 request() 加 credentials 会漏掉这里，
+  //    症状很隐蔽：整个应用都正常，唯独点"导出"时 401 —— 而导出是这个产品
+  //    价值链的最后一环。
+  const resp = await fetch(`${BASE}/sessions/${id}/export`, { credentials: 'same-origin' })
   if (!resp.ok) {
     const detail = await resp.text().catch(() => '')
     throw new ApiError(resp.status, detail || `导出失败（${resp.status}）`)
@@ -183,6 +189,99 @@ export function createMark(sessionId: number, payload: MarkCreatePayload): Promi
 
 export function deleteMark(id: number): Promise<void> {
   return request(`/marks/${id}`, { method: 'DELETE' })
+}
+
+// ---------- 书（Wave 3 §1.14 冻结契约：Round 2 的包只许消费，不许改这一段）----------
+
+export interface ChapterSummaryDto extends ArticleSummaryDto {
+  orderIndex: number
+}
+
+export interface BookSummaryDto {
+  id: number
+  title: string
+  author: string | null
+  chapterCount: number
+  finishedChapterCount: number
+  totalMarks: number
+  /** order_index 最小的、尚未读完的那一章；整本读完为 null */
+  nextChapter: { articleId: number; title: string; orderIndex: number } | null
+}
+
+export interface BookDetailDto extends BookSummaryDto {
+  chapters: ChapterSummaryDto[]
+}
+
+export function listBooks(): Promise<BookSummaryDto[]> {
+  return request('/books')
+}
+
+export function getBook(bookId: number): Promise<BookDetailDto> {
+  return request(`/books/${bookId}`)
+}
+
+/** 章节区间是闭区间，按 orderIndex；省略则整本。纯文本 Markdown，同样不走 request()。 */
+export async function exportBook(
+  bookId: number,
+  range?: { from: number; to: number },
+): Promise<string> {
+  const qs = range ? `?from=${range.from}&to=${range.to}` : ''
+  const resp = await fetch(`${BASE}/books/${bookId}/export${qs}`, {
+    credentials: 'same-origin',
+  })
+  if (!resp.ok) {
+    const detail = await resp.text().catch(() => '')
+    throw new ApiError(resp.status, detail || `导出失败（${resp.status}）`)
+  }
+  return resp.text()
+}
+
+// ---------- 登录（同上，冻结）----------
+
+export interface MeDto {
+  id: number
+  email: string
+}
+
+export interface LoginResult {
+  ok: boolean
+  /** true 表示失败次数已达阈值，前端要去取验证码再试 */
+  needsCaptcha: boolean
+  /** 被锁定时的剩余秒数，未锁定为 0 */
+  lockedForSeconds: number
+}
+
+export interface CaptchaDto {
+  id: string
+  /** 内联 SVG 字符串，前端用 dangerouslySetInnerHTML 渲染 */
+  svg: string
+}
+
+/**
+ * ⚠️ 登录失败返回的是 200 + { ok: false }，不是 401。
+ * 401 的语义是"你没权限访问这个资源"，而 /auth/login 本来就该让未登录的人访问；
+ * 更实际的原因是前端会给 401 装全局拦截器（跳登录页），登录失败再触发一次跳转会绕进循环。
+ */
+export function login(payload: {
+  email: string
+  password: string
+  captchaId?: string
+  captchaAnswer?: string
+}): Promise<LoginResult> {
+  return request('/auth/login', { method: 'POST', body: JSON.stringify(payload) })
+}
+
+export function logout(): Promise<void> {
+  return request('/auth/logout', { method: 'POST' })
+}
+
+/** 未登录时抛 ApiError(401)。调用方据此决定跳不跳登录页。 */
+export function getMe(): Promise<MeDto> {
+  return request('/auth/me')
+}
+
+export function getCaptcha(): Promise<CaptchaDto> {
+  return request('/auth/captcha')
 }
 
 // ---------- DTO ↔ 前端内部类型（types.ts） ----------
