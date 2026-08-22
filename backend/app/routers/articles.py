@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import func, or_
 
 from app.deps import CurrentUser, DbSession
-from app.models import Article, License, Mark, ReadingSession, SessionStatus, SourceType
+from app.models import Article, Book, License, Mark, ReadingSession, SessionStatus, SourceType
 from app.schemas import (
     ArticleDetail,
     ArticleImportText,
@@ -173,11 +173,14 @@ async def import_epub(
     user: CurrentUser,
     file: Annotated[UploadFile, File()],
     titles: Annotated[list[str], Form()] = [],  # noqa: B006 - FastAPI Form 需要可变默认值来识别重复字段
+    book_title: Annotated[str | None, Form(alias="bookTitle")] = None,
 ):
-    """两段式：不传 titles 只探测候选片段，传了才真正入库。"""
+    """两段式：不传 titles 只探测候选片段，传了才真正入库（入库即建书，Wave 3 B3）。"""
     data = await file.read()
     segments = parse_epub(data)
 
+    # —— 第一段：只探测，不入库。⚠️ 这一段的行为一个字都不许变 ——
+    # 它是解析质量的人工闸门：先看清切出来是什么，再决定导哪几章。
     if not titles:
         candidates = [
             EpubImportCandidate(title=seg.title, word_count=seg.word_count) for seg in segments
@@ -189,10 +192,45 @@ async def import_epub(
     wanted = set(titles)
     source_name = file.filename.rsplit(".", 1)[0] if file.filename else None
 
+    # ⚠️ order_index 按 segments 的**原始顺序**，不是 titles 表单里的顺序 ——
+    #    表单里的勾选顺序是浏览器给的，和书内顺序无关（§1.10：order_index 是
+    #    书内顺序的唯一权威，从 1 开始、连续、不重复）。
+    selected = [seg for seg in segments if seg.title in wanted]
+    if not selected:
+        # 一章都没匹配上就不建书。空书会留在书架上占位，而且下次同名导入还会被判重挡住。
+        return JSONResponse(status_code=201, content=[])
+
+    resolved_book_title = (book_title or source_name or "未命名").strip() or "未命名"
+
+    # 判重：同名书重复导入直接报错，不产生第二本 —— 两本同名书之后再也分不清
+    # 哪本上有他的标记，而标记是这个产品唯一不可再生的数据。
+    existing = (
+        db.query(Book)
+        .filter(
+            Book.title == resolved_book_title,
+            or_(Book.created_by.is_(None), Book.created_by == user.id),
+        )
+        .first()
+    )
+    if existing is not None:
+        raise HTTPException(
+            status_code=409,
+            detail=f"这本书已经导入过了（书 id={existing.id}）。要加章节请先删掉旧的那本。",
+        )
+
+    book = Book(
+        title=resolved_book_title,
+        author=None,
+        # 书和章同一套版权分层（tech-plan.md §4.2）。epub 几乎必然是 A 层。
+        license=License.COPYRIGHTED,
+        redistributable=False,
+        created_by=user.id,
+    )
+    db.add(book)
+    db.flush()  # 拿到 book.id，章节才好带着 book_id 一起进去
+
     imported: list[Article] = []
-    for seg in segments:
-        if seg.title not in wanted:
-            continue
+    for order_index, seg in enumerate(selected, start=1):
         body_paragraphs = tokenize("\n\n".join(seg.paragraphs))
         word_count = sum(len(p) for p in body_paragraphs)
         article = Article(
@@ -207,6 +245,8 @@ async def import_epub(
             est_minutes=_est_minutes(word_count),
             topics=[],
             created_by=user.id,
+            book_id=book.id,
+            order_index=order_index,
         )
         db.add(article)
         imported.append(article)

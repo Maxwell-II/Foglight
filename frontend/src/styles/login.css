@@ -1,0 +1,117 @@
+/* Wave 3 A2：登录页 / 路由守卫。
+   只写这条线特有的东西 —— 表单本身复用 index.css 已有的
+   .wrap / .field / .import-form / .btn-primary / .error-banner，
+   不新造一套长得差不多的样式。
+   由 LoginPage.tsx 和 RequireAuth.tsx import，晚于 index.css 加载。 */
+
+.wrap.login-wrap {
+  max-width: 380px;
+  padding-top: 72px;
+  padding-bottom: 48px;
+}
+
+.login-title {
+  margin-bottom: 4px;
+}
+
+.login-sub {
+  font-size: 13px;
+  margin: 0;
+}
+
+.import-form.login-form {
+  max-width: none;
+  margin-top: 22px;
+}
+
+.login-submit {
+  margin-top: 4px;
+}
+.login-submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ---------- 验证码 ---------- */
+
+.captcha-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 图是个按钮：点一下换一张。padding:0 是为了让 SVG 贴边，
+   line-height:0 去掉 inline 元素底部那条基线留白。 */
+.captcha-image {
+  padding: 0;
+  line-height: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  overflow: hidden;
+  flex: none;
+}
+.captcha-image:hover {
+  border-color: var(--ink);
+}
+.captcha-image svg {
+  display: block;
+  height: 44px;
+  width: auto;
+}
+.captcha-image.is-empty {
+  line-height: 1;
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.captcha-input {
+  flex: 1;
+  min-width: 0;
+  /* .field input 的样式够用，这里只补一条：验证码是 4 位字母数字，
+     等宽 + 加字距能让"是 8 还是 B"这种事在输入框里也看得清 */
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.captcha-hint {
+  font-size: 12px;
+  color: var(--dim);
+}
+
+/* ---------- 守卫 ---------- */
+
+/* checking 态的占位：**故意什么都不画**。
+   放个 spinner 的话，本机 /auth/me 通常几十毫秒就回来了，
+   反而会闪一下加载动画 —— 那和闪一下登录页一样难看。
+   给一个撑住高度的空盒子，防止内容回来时页面跳一下。 */
+.auth-checking {
+  min-height: 100vh;
+}
+
+/* 退出：紧挨着 ThemeToggle（fixed, top:12px, right:12px, 34px 宽） */
+.logout-btn {
+  position: fixed;
+  top: 12px;
+  right: 54px;
+  z-index: 30;
+  height: 34px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 17px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--dim);
+  font-size: 13px;
+  line-height: 1;
+}
+.logout-btn:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.logout-btn:disabled {
+  opacity: 0.55;
+}

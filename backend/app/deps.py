@@ -1,39 +1,153 @@
 """FastAPI 依赖。
 
-★ 这个文件是 Phase 3 接入登录的唯一改动点。
+★ 这个文件是接入登录的唯一改动点，Wave 3 §1.12 已核实这句话仍然成立：
+  articles.py / sessions.py / marks.py 的每一个路由都通过 CurrentUser 拿用户，
+  没有任何一处直接读 settings.single_user_id —— 所以下面这个函数从
+  "返回固定用户"换成"读 cookie 查会话表"之后，业务路由一行都不用改。
 
-Phase 1 没有登录，所有请求都算作配置里那个固定用户。业务代码一律通过
-get_current_user() 拿用户，绝不直接读 settings.single_user_id —— 这样
-Phase 3 换成"从 session cookie 解析"时，只需要重写下面这一个函数，
-路由和业务逻辑一行都不用动。
+  （这是选 FastAPI 而不是 Next.js 的直接回报之一，见 docs/architecture.md §2.3）
 
-（这是选 FastAPI 而不是 Next.js 的直接回报之一，见 docs/architecture.md §2.3）
+现在的行为（Wave 3 A1）::
+
+    读 reading_session cookie -> 查 auth_sessions -> 未过期则返回对应 User
+                                                  -> 否则 401 {"detail": "未登录"}
+
+⚠️ 401 不带 `WWW-Authenticate` 头，也**绝不 302 跳转**（§1.12(c)）：
+   - 302 会被 fetch 静默跟随，前端拿回一坨 HTML，报错变成"JSON 解析失败"，
+     完全指错方向；
+   - `WWW-Authenticate` 会让浏览器弹出原生 Basic Auth 对话框，那是 nginx
+     那一层的东西，和本应用的登录页冲突。
 """
 
+from __future__ import annotations
+
+import hashlib
+import secrets
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db import get_db
-from app.models import User
+from app.models import AuthSession, User
 
 DbSession = Annotated[Session, Depends(get_db)]
 
+# —— Cookie 属性（§1.13，写死，不要改）——
+SESSION_COOKIE_NAME = "reading_session"
+SESSION_COOKIE_PATH = "/"
+SESSION_COOKIE_SAMESITE = "lax"
 
-def get_current_user(db: DbSession) -> User:
-    """Phase 1：返回固定用户，不存在则建出来。
+UNAUTHENTICATED_DETAIL = "未登录"
 
-    Phase 3 换成：读 session cookie → 查会话表 → 返回对应 User，
-    失效时抛 401。函数签名保持不变。
+# 令牌长度：32 字节熵，token_urlsafe 出来 43 个字符
+_TOKEN_BYTES = 32
+
+
+def as_utc(value: datetime) -> datetime:
+    """SQLite 的 DATETIME 列不存时区，读回来一律是 naive 的。
+
+    库里存进去的都是 UTC（models._utcnow），所以 naive 值直接补上 UTC 即可。
+    不补的话 `naive < aware` 会直接 TypeError —— 而它只在"会话过期"这条
+    冷路径上发作，平时测不出来。
     """
-    user = db.get(User, settings.single_user_id)
-    if user is None:
-        user = User(id=settings.single_user_id)
-        db.add(user)
+    return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+
+
+def hash_token(token: str) -> str:
+    """存进 auth_sessions 的是这个摘要，不是明文令牌。
+
+    理由（§1.13）：db 文件会被 deploy/backup.sh 备份到 /var/backups 并保留
+    7 份，明文令牌进备份等于把登录态泄漏面扩大到所有历史备份。
+    """
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def issue_session(db: Session, user: User) -> tuple[str, datetime]:
+    """建一条登录会话，返回 (明文令牌, 过期时间)。明文只回给调用方写进 cookie。"""
+    token = secrets.token_urlsafe(_TOKEN_BYTES)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=settings.session_ttl_days)
+    db.add(AuthSession(user_id=user.id, token_hash=hash_token(token), expires_at=expires_at))
+    db.commit()
+    return token, expires_at
+
+
+def revoke_session(db: Session, token: str | None) -> bool:
+    """退出登录：删掉这一行。删行而不是打标记 —— 要的就是"立刻失效"。"""
+    if not token:
+        return False
+    deleted = (
+        db.query(AuthSession)
+        .filter(AuthSession.token_hash == hash_token(token))
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return bool(deleted)
+
+
+def purge_expired_sessions(db: Session) -> int:
+    """顺手清理过期会话。和验证码一样，不为它加定时任务。"""
+    deleted = (
+        db.query(AuthSession)
+        .filter(AuthSession.expires_at < datetime.now(timezone.utc))
+        .delete(synchronize_session=False)
+    )
+    return int(deleted)
+
+
+def set_session_cookie(response: Response, token: str) -> None:
+    """写登录 cookie。
+
+    ⚠️ `secure` 必须走 settings.session_cookie_secure，**不许写死 True** ——
+       本地开发跑在 http，写死 True 会让浏览器根本不发这条 cookie，而且
+       不报任何错，症状是"登录返回 200 但下一个请求就 401"，极难判断。
+       线上由 deploy/docker-compose.yml 注入 SESSION_COOKIE_SECURE=true。
+    """
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=token,
+        max_age=settings.session_ttl_days * 24 * 60 * 60,
+        httponly=True,  # JS 读不到，XSS 偷不走
+        secure=settings.session_cookie_secure,
+        samesite=SESSION_COOKIE_SAMESITE,
+        path=SESSION_COOKIE_PATH,
+    )
+
+
+def clear_session_cookie(response: Response) -> None:
+    """删 cookie。属性必须和写入时一致，否则浏览器认不出是同一条，删不掉。"""
+    response.delete_cookie(
+        key=SESSION_COOKIE_NAME,
+        path=SESSION_COOKIE_PATH,
+        httponly=True,
+        secure=settings.session_cookie_secure,
+        samesite=SESSION_COOKIE_SAMESITE,
+    )
+
+
+def get_current_user(request: Request, db: DbSession) -> User:
+    """读 session cookie → 查会话表 → 返回对应 User，失效时抛 401。"""
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    if not token:
+        raise HTTPException(status_code=401, detail=UNAUTHENTICATED_DETAIL)
+
+    auth_session = (
+        db.query(AuthSession).filter(AuthSession.token_hash == hash_token(token)).one_or_none()
+    )
+    if auth_session is None:
+        raise HTTPException(status_code=401, detail=UNAUTHENTICATED_DETAIL)
+
+    if as_utc(auth_session.expires_at) <= datetime.now(timezone.utc):
+        # 过期就地删掉：下次不用再算一遍，也不留着占 unique 索引
+        db.delete(auth_session)
         db.commit()
-        db.refresh(user)
+        raise HTTPException(status_code=401, detail=UNAUTHENTICATED_DETAIL)
+
+    user = db.get(User, auth_session.user_id)
+    if user is None:
+        raise HTTPException(status_code=401, detail=UNAUTHENTICATED_DETAIL)
     return user
 
 

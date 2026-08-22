@@ -10,6 +10,9 @@ RUN pip install --no-cache-dir -e .
 COPY app/ ./app/
 COPY alembic/ ./alembic/
 COPY alembic.ini ./
+# scripts/ 必须进镜像：部署手册里「容器里跑 scripts/create_user.py 建账号」
+# 是上线流程的第 2 步，没有这一行那一步会直接 file not found。
+COPY scripts/ ./scripts/
 
 EXPOSE 8000
 

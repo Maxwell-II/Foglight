@@ -403,3 +403,48 @@ kbd {
   line-height: 1;
 }
 .theme-toggle:hover { border-color: var(--ink); }
+
+/* ---------- Wave 3 B1/B2：书架 / 目录 / 书级导出 ----------
+   刻意不新造卡片样式：书架和目录直接用上面那套 .article-card / .article-grid，
+   这里只补三处书特有的东西（章号、下一章那行、导出的区间输入）。 */
+
+.library-header__actions { display: flex; align-items: center; gap: 14px; }
+/* .back-link 自带 margin-bottom，放进这一行会把它顶歪 */
+.library-header__actions .back-link { margin-bottom: 0; }
+
+/* 章号。和标题同一行，压暗一档 —— 它是定位用的，不该抢标题的注意力 */
+.chapter-index {
+  color: var(--dim);
+  font-weight: 400;
+  margin-right: 8px;
+}
+
+/* 书架卡片上的「继续读：第 N 章 …」。用强调色，因为它才是这张卡要人点的地方 */
+.book-card__next {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--pink-edge);
+}
+.article-card__button:disabled .book-card__next { color: var(--dim); }
+
+/* 复盘页底部的下一章入口（components/BookNextChapter.tsx） */
+.book-next {
+  margin-top: 32px;
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.book-next .btn-primary { border: none; }
+
+.book-export__range {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 12px 0 16px;
+}
+.book-export__range .field { flex-direction: column; }
+.book-export__range input { width: 90px; }

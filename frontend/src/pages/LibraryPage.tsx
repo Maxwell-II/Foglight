@@ -98,9 +98,15 @@ export default function LibraryPage() {
     <div className="wrap">
       <div className="library-header">
         <h1 className="title">文章库</h1>
-        <Link className="btn-primary" to="/import">
-          + 导入文章
-        </Link>
+        <div className="library-header__actions">
+          {/* 书是另一个入口，不是另一套阅读器：首页保持短文默认不变（§0.2） */}
+          <Link className="back-link" to="/books">
+            书架 →
+          </Link>
+          <Link className="btn-primary" to="/import">
+            + 导入文章
+          </Link>
+        </div>
       </div>
 
       {error && <p className="error-banner">{error}</p>}

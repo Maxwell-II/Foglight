@@ -155,3 +155,56 @@ class SessionOut(ApiModel):
 
 class SessionDetail(SessionOut):
     marks: list[MarkOut] = Field(default_factory=list)
+
+
+# ---------- Book（Wave 3 §1.9 / §1.11）----------
+#
+# 书级的三个计数和「下一章」全是派生值，不加数据库列 —— 和 level（§1.7）、
+# is_read（Wave 2.5）同一条理由：加列 = 多一个会和事实漂移的冗余字段。
+# 算法在 routers/books.py，一条 SQL 聚合完。
+
+
+class ChapterSummary(ArticleSummary):
+    """书里的一章 = ArticleSummary + 书内序号。
+
+    章节就是 Article（§1.9），所以这里继承而不是另起一份 —— 前四个会话派生值
+    （isRead / resumeSessionId / lastMarksSessionId / lastMarksCount）由
+    routers/articles.py 的 _attach_session_state 挂上，书籍路由直接 import 它复用。
+
+    order_index 不可空：散篇文章才是 NULL，能走到这个模型的一定属于某本书。
+    真出现 NULL 是数据完整性问题（§1.10 要求书内连续不重复），宁可在这里报错，
+    也不要静默按 0 处理把顺序搞乱。
+    """
+
+    order_index: int
+
+
+class BookNextChapter(ApiModel):
+    """§1.11 写死的定义：order_index 最小的、且不存在 finished 会话的那一章。
+
+    ⚠️ 不是「最后读的那章 + 1」—— 跳读之后那个定义会指向已经读过的章。
+    """
+
+    article_id: int
+    title: str
+    order_index: int
+
+
+class BookSummary(ApiModel):
+    """书架用。不含章节列表 —— 一本 62 章的书，书架上不该带 62 条正文元数据。"""
+
+    id: int
+    title: str
+    author: str | None = None
+    chapter_count: int
+    finished_chapter_count: int
+    # 这本书上一共标了多少处：该用户在本书全部章节、全部会话上的标记总数。
+    # 不是「最近一次」的数 —— 那个是章级的 lastMarksCount。
+    total_marks: int
+    next_chapter: BookNextChapter | None = None
+
+
+class BookDetail(BookSummary):
+    """目录页用，带上按 order_index 排好的章节。"""
+
+    chapters: list[ChapterSummary] = Field(default_factory=list)

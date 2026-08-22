@@ -10,6 +10,7 @@ import {
   type SessionDetailDto,
 } from '../api/client'
 import { cmp } from '../lib/pos'
+import BookNextChapter from '../components/BookNextChapter'
 
 function markPos(m: MarkDto) {
   return { p: m.startParagraphIdx, w: m.startWordIdx }
@@ -118,6 +119,10 @@ export default function ReviewPage() {
         <button className="btn-primary" onClick={copyMarkdown}>
           {copied ? '已复制' : '复制到剪贴板'}
         </button>
+
+        {/* 书里的章节才渲染，散篇文章时组件自己返回 null。
+            放在复盘之后而不是读完直接跳下一章 —— 读完就复盘是这个产品的主张。 */}
+        {session && <BookNextChapter articleId={session.articleId} />}
       </section>
     </div>
   )
