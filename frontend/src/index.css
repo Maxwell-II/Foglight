@@ -21,6 +21,12 @@
   --info-fg: #2a5f96;
   --word-hover: rgba(0, 0, 0, 0.055);
 
+  /* 右上角操作区（主题 + 退出）占的宽度。**唯一真相源**：
+     .app-actions 用它当 min-width，.toolbar 用它算 padding-right 把内容让开。
+     以前这两边靠各自硬编码的 right:12 / right:54 互相让位，一改就重合。
+     往操作区里加按钮，只需要改这一个数。 */
+  --actions-w: 104px;
+
   /* 告诉浏览器当前是哪套配色。没有这一行，UA 默认色（按钮的 buttontext、输入框、
      滚动条、表单控件）会一直按亮色给，暗色下就是深底配黑字。 */
   color-scheme: light;
@@ -95,7 +101,9 @@ button { font-family: inherit; cursor: pointer; }
   display: flex;
   align-items: center;
   gap: 20px;
-  padding: 10px 24px;
+  /* 右内边距要多让出 --actions-w：右上角那两个按钮是 fixed 的，
+     不参与这里的流，不让位就会盖住「完成阅读」。 */
+  padding: max(10px, env(safe-area-inset-top)) calc(24px + var(--actions-w)) 10px 24px;
   background: var(--toolbar-bg);
   backdrop-filter: blur(6px);
   border-bottom: 2px solid var(--line);
@@ -129,9 +137,19 @@ kbd {
   color: var(--dim);
 }
 
-.hint-text { font-size: 13px; color: var(--dim); flex: 1; }
-.right { display: flex; align-items: center; gap: 14px; }
-.counts { font-size: 13px; color: var(--dim); }
+/* min-width:0 + nowrap：flex:1 默认是 `1 1 0%`，允许收缩到 0；中文没有单词
+   边界，压窄了就逐字换行、把整条 toolbar 顶成一列竖字。宁可截断也不竖排。 */
+.hint-text {
+  font-size: 13px;
+  color: var(--dim);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.right { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+.counts { font-size: 13px; color: var(--dim); white-space: nowrap; }
 .counts b { color: var(--ink); font-size: 15px; }
 
 .btn-primary {
@@ -141,6 +159,7 @@ kbd {
   font-size: 14px;
   padding: 8px 16px;
   border-radius: 6px;
+  white-space: nowrap;
 }
 
 /* ---------- 正文 ---------- */
@@ -385,11 +404,21 @@ kbd {
 
 /* ---------- W3：主题切换按钮 ---------- */
 
-.theme-toggle {
+/* 右上角操作区。主题/退出按钮都不再自带 position —— 排布只由这里说了算。 */
+.app-actions {
   position: fixed;
-  top: 12px;
+  top: max(12px, env(safe-area-inset-top));
   right: 12px;
   z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: var(--actions-w);
+}
+
+.theme-toggle {
+  flex-shrink: 0;
   width: 34px;
   height: 34px;
   display: inline-flex;
@@ -448,3 +477,42 @@ kbd {
 }
 .book-export__range .field { flex-direction: column; }
 .book-export__range input { width: 90px; }
+
+/* ---------- 窄屏 ----------
+   在这条之前，整个项目一条宽度断点都没有（唯一的 @media 是配色）。
+   手机上 toolbar 那一行 4 个子项挤在 390px 里，直接被压垮。 */
+@media (max-width: 640px) {
+  :root {
+    /* 窄屏按钮更小，让位也跟着收 */
+    --actions-w: 92px;
+  }
+
+  .toolbar {
+    /* 换成两行。padding 恢复对称 —— 让位改由 .pens 自己做，
+       这样第二行能用满宽度，不会莫名其妙缩在左边。 */
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    padding: max(8px, env(safe-area-inset-top)) 12px 8px;
+  }
+
+  /* 独占第一行。**写死 100% 而不是靠自然换行**：靠挤爆来换行的话，
+     屏幕稍宽一点就又变回一行，而那时 .right 会钻到右上角按钮底下。 */
+  .pens {
+    flex: 1 0 100%;
+    padding-right: var(--actions-w);   /* 给 fixed 的右上角操作区让位 */
+  }
+
+  /* 提示语在手机上本来就半失效（没有 hover，也没有 Esc 键），
+     与其压成一条竖字，不如让出空间。 */
+  .hint-text { display: none; }
+
+  .pen { padding: 5px 10px; font-size: 12px; gap: 4px; }
+  .pen kbd { display: none; }   /* 数字快捷键在手机上按不出来 */
+
+  /* 第二行：推到右侧，与正文右边缘对齐 */
+  .right { margin-left: auto; gap: 10px; }
+
+  .wrap { padding: 20px 16px 100px; }
+
+  .logout-btn { padding: 0 10px; font-size: 12px; }
+}

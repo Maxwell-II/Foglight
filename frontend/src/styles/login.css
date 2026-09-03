@@ -91,12 +91,11 @@
   min-height: 100vh;
 }
 
-/* 退出：紧挨着 ThemeToggle（fixed, top:12px, right:12px, 34px 宽） */
+/* 退出：**不自己定位**。位置由 .app-actions 排（index.css）。
+   以前这里写死 right:54px 去躲 ThemeToggle 的 right:12px + 34px 宽，
+   两个文件各存一半布局，改任何一边都会重合。 */
 .logout-btn {
-  position: fixed;
-  top: 12px;
-  right: 54px;
-  z-index: 30;
+  flex-shrink: 0;
   height: 34px;
   padding: 0 12px;
   display: inline-flex;

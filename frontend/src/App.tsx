@@ -5,7 +5,7 @@ import BookDetailPage from './pages/BookDetailPage'
 import ImportPage from './pages/ImportPage'
 import ReaderPage from './pages/ReaderPage'
 import ReviewPage from './pages/ReviewPage'
-import ThemeToggle from './components/ThemeToggle'
+import AppActions from './components/AppActions'
 import RequireAuth from './components/RequireAuth'
 import LoginPage from './pages/LoginPage'
 
@@ -21,10 +21,18 @@ function NotFound() {
 export default function App() {
   return (
     <BrowserRouter>
-      <ThemeToggle />
       <Routes>
-        {/* /login 必须在守卫之外，否则未登录跳过来会再被弹走一次，绕成死循环 */}
-        <Route path="/login" element={<LoginPage />} />
+        {/* /login 必须在守卫之外，否则未登录跳过来会再被弹走一次，绕成死循环。
+            它自带一份只有主题按钮的 AppActions —— 未登录时没有「退出」可点。 */}
+        <Route
+          path="/login"
+          element={
+            <>
+              <AppActions />
+              <LoginPage />
+            </>
+          }
+        />
 
         {/* 无路径的 layout route：守卫只挂一层，页面之间切换不重挂，
             所以 /auth/me 全程只打一次。

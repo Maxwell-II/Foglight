@@ -8,9 +8,10 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { LOGIN_PATH, probeAuth, signOut, type AuthStatus } from '../lib/auth'
+import AppActions from './AppActions'
 import '../styles/login.css'
 
-/** 退出入口。固定在右上角，紧挨着 ThemeToggle（那个在 34px 宽、right:12px）。 */
+/** 退出入口。自身不定位 —— 位置由包着它的 <AppActions> 决定。 */
 function LogoutButton() {
   const navigate = useNavigate()
   const [leaving, setLeaving] = useState(false)
@@ -53,7 +54,13 @@ export default function RequireAuth({ children }: { children: ReactNode }) {
   if (status === 'checking') {
     // ⚠️ 这一支是三态的全部意义所在：既不渲染内容，**也不渲染登录页**。
     //    渲染登录页的话，硬刷新首页会闪一下登录表单再跳回来。
-    return <div className="auth-checking" role="status" aria-busy="true" aria-label="正在确认登录状态" />
+    // 主题按钮照常渲染：它和登录状态无关，探测这几十毫秒里让它闪掉才难看。
+    return (
+      <>
+        <AppActions />
+        <div className="auth-checking" role="status" aria-busy="true" aria-label="正在确认登录状态" />
+      </>
+    )
   }
 
   if (status === 'anonymous') {
@@ -66,7 +73,9 @@ export default function RequireAuth({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <LogoutButton />
+      <AppActions>
+        <LogoutButton />
+      </AppActions>
       {children}
     </>
   )
