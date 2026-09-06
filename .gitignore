@@ -21,3 +21,6 @@ seed/texts/
 # Locally prepared copyrighted books and their extracted assets.
 seed/book-data/
 backend/book-assets/
+
+backend/reading.db.before-password-reset-20260906-172926
+backend/reading.db.before-wave3b-migration-20260906-174229
