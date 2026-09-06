@@ -9,6 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # 会各自连到不同的 reading.db，症状是灌完种子后接口查不到任何文章。
 _BACKEND_DIR = Path(__file__).resolve().parent.parent
 _DEFAULT_DB = _BACKEND_DIR / "reading.db"
+_DEFAULT_BOOK_ASSETS = _BACKEND_DIR / "book-assets"
 
 
 class Settings(BaseSettings):
@@ -16,6 +17,7 @@ class Settings(BaseSettings):
 
     # 线上由 docker-compose 注入 sqlite:////data/reading.db（4 个斜杠 = 绝对路径）
     database_url: str = f"sqlite:///{_DEFAULT_DB}"
+    book_assets_dir: Path = _DEFAULT_BOOK_ASSETS
 
     # Phase 1 是单用户，没有登录。这个 id 由 deps.get_current_user() 使用。
     # Phase 3 接入真实认证后此项作废，见 deps.py 的说明。

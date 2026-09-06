@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ApiError,
   createMark,
   deleteMark,
   getArticle,
   getSession,
+  finishBookReading,
+  openBookPage,
   toArticle,
   toMark,
   toMarkCreatePayload,
@@ -26,6 +28,8 @@ export default function ReaderPage() {
   const { sessionId: sessionIdParam } = useParams<{ sessionId: string }>()
   const sessionId = Number(sessionIdParam)
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const bookRunId = Number(searchParams.get('run')) || undefined
 
   const [session, setSession] = useState<SessionDetailDto | null>(null)
   const [articleDto, setArticleDto] = useState<ArticleDetailDto | null>(null)
@@ -35,6 +39,17 @@ export default function ReaderPage() {
   // useMarking 没有暴露"注入初始标记"的接口（也不该有，那不是它的职责），
   // 所以已保存的走这份独立状态，渲染时和 useMarking 的 marks 合并。
   const [savedMarks, setSavedMarks] = useState<Mark[]>([])
+  const [finishing, setFinishing] = useState(false)
+  const pendingWrites = useRef<Set<Promise<unknown>>>(new Set())
+  const trackWrite = useCallback((request: Promise<unknown>) => {
+    pendingWrites.current.add(request)
+    void request.finally(() => pendingWrites.current.delete(request))
+  }, [])
+  const flushWrites = useCallback(async () => {
+    while (pendingWrites.current.size > 0) {
+      await Promise.allSettled([...pendingWrites.current])
+    }
+  }, [])
 
   const [toast, setToast] = useState<{ text: string; kind: 'error' | 'info' } | null>(null)
   const toastTimer = useRef<number | undefined>(undefined)
@@ -96,15 +111,17 @@ export default function ReaderPage() {
     (mark: Mark) => {
       setSavedMarks((ms) => ms.filter((m) => m.id !== mark.id))
       const serverId = Number(mark.id.slice(1))
-      deleteMark(serverId).catch(() => {
+      const request = deleteMark(serverId).catch(() => {
         showToast('取消这条标记时网络出错，刷新后可能会重新出现', 'error')
       })
+      trackWrite(request)
     },
-    [showToast],
+    [showToast, trackWrite],
   )
 
   const handleWordClick = useCallback(
     (pos: Pos) => {
+      if (finishing) return
       if (marking.state.kind === 'idle') {
         const hit = marksAt(savedMarks, pos).find((m) => m.type === 'unknown_word')
         if (hit) {
@@ -120,7 +137,7 @@ export default function ReaderPage() {
       }
       marking.clickWord(pos)
     },
-    [marking, savedMarks, removeSavedMark],
+    [finishing, marking, savedMarks, removeSavedMark],
   )
 
   // ---------- 本次会话新建标记的后台同步：先更新界面，再后台发请求 ----------
@@ -130,6 +147,13 @@ export default function ReaderPage() {
   const localToServerId = useRef<Map<string, number>>(new Map())
   const pendingCancel = useRef<Set<string>>(new Set())
   const prevHookMarks = useRef<Mark[]>([])
+  useEffect(() => {
+    marking.reset()
+    localToServerId.current.clear()
+    pendingCancel.current.clear()
+    prevHookMarks.current = []
+    setFinishing(false)
+  }, [sessionId]) // marking methods are stable; session identity is the reset boundary
 
   useEffect(() => {
     if (!session || !article) return
@@ -140,18 +164,18 @@ export default function ReaderPage() {
     for (const mark of marking.marks) {
       if (prevIds.has(mark.id)) continue
       const payload = toMarkCreatePayload(mark, article.paragraphs)
-      createMark(session.id, payload)
+      const request = createMark(session.id, { ...payload, ...(bookRunId ? { bookRunId } : {}) })
         .then((dto) => {
           if (pendingCancel.current.delete(mark.id)) {
             // 还没落库就已经被用户点掉了：补一刀删除，界面早已经是"没有"的状态
-            deleteMark(dto.id).catch(() => undefined)
-            return
+            return deleteMark(dto.id).catch(() => undefined)
           }
           localToServerId.current.set(mark.id, dto.id)
         })
         .catch(() => {
           showToast('有一条标记没能存到服务器，请重新点一下', 'error')
         })
+      trackWrite(request)
     }
 
     for (const mark of prev) {
@@ -162,13 +186,14 @@ export default function ReaderPage() {
         continue
       }
       localToServerId.current.delete(mark.id)
-      deleteMark(serverId).catch(() => {
+      const request = deleteMark(serverId).catch(() => {
         showToast('取消这条标记时网络出错，刷新后可能会重新出现', 'error')
       })
+      trackWrite(request)
     }
 
     prevHookMarks.current = marking.marks
-  }, [marking.marks, session, article, showToast])
+  }, [marking.marks, session, article, showToast, bookRunId, trackWrite])
 
   // ---------- 崩溃保险：整份标记镜像到 localStorage ----------
   useEffect(() => {
@@ -183,11 +208,12 @@ export default function ReaderPage() {
   // ---------- 阅读进度：滚动防抖后 PATCH ----------
   const scrollRestored = useRef(false)
   useEffect(() => {
+    scrollRestored.current = false
+  }, [sessionId])
+  useEffect(() => {
     if (!session || !article || scrollRestored.current) return
     scrollRestored.current = true
-    if (session.scrollPosition > 0) {
-      requestAnimationFrame(() => window.scrollTo(0, session.scrollPosition))
-    }
+    requestAnimationFrame(() => window.scrollTo(0, session.scrollPosition))
   }, [session, article])
 
   useEffect(() => {
@@ -221,10 +247,20 @@ export default function ReaderPage() {
   }, [showToast])
 
   // ---------- 完成阅读 ----------
-  const [finishing, setFinishing] = useState(false)
-  const finish = useCallback(() => {
+  const finish = useCallback(async () => {
     if (!session || finishing) return
     setFinishing(true)
+    await flushWrites()
+    if (articleDto?.bookContext && bookRunId) {
+      try {
+        await finishBookReading(articleDto.bookContext.bookId, bookRunId)
+        navigate(`/books/${articleDto.bookContext.bookId}/review?run=${bookRunId}`)
+      } catch {
+        showToast('结束本次阅读失败，请重试', 'error')
+        setFinishing(false)
+      }
+      return
+    }
     updateSession(session.id, { status: 'finished' })
       .catch(() => {
         // 状态没存上也不阻塞去汇总页；Review 页会重新拉一次会话
@@ -232,7 +268,24 @@ export default function ReaderPage() {
       .finally(() => {
         navigate(`/review/${session.id}`)
       })
-  }, [session, finishing, navigate])
+  }, [session, finishing, navigate, articleDto, bookRunId, showToast, flushWrites])
+
+  const goBookPage = useCallback(
+    async (articleId: number, finishCurrent: boolean) => {
+      if (!session || !articleDto?.bookContext || !bookRunId || finishing) return
+      setFinishing(true)
+      await flushWrites()
+      try {
+        if (finishCurrent) await updateSession(session.id, { status: 'finished' })
+        const opened = await openBookPage(articleDto.bookContext.bookId, bookRunId, articleId)
+        navigate(`/read/${opened.sessionId}?run=${bookRunId}`)
+      } catch {
+        showToast('翻页失败，请重试', 'error')
+        setFinishing(false)
+      }
+    },
+    [session, articleDto, bookRunId, finishing, navigate, showToast, flushWrites],
+  )
 
   // F 快捷键完成阅读（architecture.md §6：1 黄笔 / 2 粉笔 / Esc 取消 / F 完成阅读）
   useEffect(() => {
@@ -252,7 +305,7 @@ export default function ReaderPage() {
     )
   }
 
-  if (!session || !article) {
+  if (!session || !article || !articleDto) {
     return (
       <div className="wrap">
         <p className="dim">加载中…</p>
@@ -268,14 +321,16 @@ export default function ReaderPage() {
         counts={counts}
         onSetPen={marking.setPen}
         onFinish={finish}
+        finishLabel={articleDto.bookContext ? '结束本次阅读' : '完成阅读'}
       />
 
       <div className="wrap">
-        <Link className="back-link" to="/">
-          ← 返回文章库
+        <Link className="back-link" to={articleDto.bookContext ? `/books/${articleDto.bookContext.bookId}` : '/'}>
+          ← {articleDto.bookContext ? '返回目录' : '返回文章库'}
         </Link>
         <h1 className="title">{article.title}</h1>
         <div className="meta">
+          {articleDto.bookContext && `${articleDto.bookContext.sectionTitle} · 第 ${articleDto.bookContext.pageNumber}/${articleDto.bookContext.pageCount} 页 · `}
           {article.author || '佚名'} · {article.wordCount} 词 · 约 {article.estMinutes} 分钟
         </div>
 
@@ -285,7 +340,38 @@ export default function ReaderPage() {
           preview={marking.preview}
           onWordClick={handleWordClick}
           onWordHover={marking.hoverWord}
+          layout={articleDto.bookPageLayout}
+          imageUrl={
+            articleDto.bookContext
+              ? (key) => `/api/books/${articleDto.bookContext!.bookId}/assets/${key}`
+              : undefined
+          }
         />
+
+        {articleDto.bookContext && bookRunId && (
+          <nav className="book-page-nav" aria-label="书页导航">
+            <button
+              className="btn-secondary"
+              disabled={!articleDto.bookContext.previousArticleId || finishing}
+              onClick={() => void goBookPage(articleDto.bookContext!.previousArticleId!, false)}
+            >
+              ← 上一页
+            </button>
+            {articleDto.bookContext.nextArticleId ? (
+              <button
+                className="btn-primary"
+                disabled={finishing}
+                onClick={() => void goBookPage(articleDto.bookContext!.nextArticleId!, true)}
+              >
+                读完本页，下一页 →
+              </button>
+            ) : (
+              <button className="btn-primary" disabled={finishing} onClick={() => void finish()}>
+                结束本次阅读
+              </button>
+            )}
+          </nav>
+        )}
       </div>
 
       {toast && <div className={`sync-toast sync-toast--${toast.kind}`}>{toast.text}</div>}

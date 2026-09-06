@@ -19,6 +19,9 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
+    Index,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
@@ -62,6 +65,11 @@ class SessionStatus(StrEnum):
 class MarkType(StrEnum):
     UNKNOWN_WORD = "unknown_word"
     UNCLEAR = "unclear"
+
+
+class BookReadingMode(StrEnum):
+    LEGACY_CHAPTERS = "legacy_chapters"
+    FIXED_PAGES = "fixed_pages"
 
 
 class User(Base):
@@ -110,6 +118,11 @@ class Book(Base):
     # 和 Article 同一套版权分层（tech-plan.md §4.2）。书几乎必然是 A 层。
     license: Mapped[str] = mapped_column(String(64))
     redistributable: Mapped[bool] = mapped_column(Boolean, default=False)
+    reading_mode: Mapped[str] = mapped_column(
+        String(32), default=BookReadingMode.LEGACY_CHAPTERS
+    )
+    content_key: Mapped[str | None] = mapped_column(String(128), unique=True, nullable=True)
+    content_manifest: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     created_by: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
@@ -127,10 +140,36 @@ class Book(Base):
     chapters: Mapped[list["Article"]] = relationship(
         back_populates="book", order_by="Article.order_index", passive_deletes=True
     )
+    sections: Mapped[list["BookSection"]] = relationship(
+        back_populates="book", order_by="BookSection.order_index", passive_deletes=True
+    )
+    reading_runs: Mapped[list["BookReadingRun"]] = relationship(
+        back_populates="book", passive_deletes=True
+    )
+
+
+class BookSection(Base):
+    """原书目录节点。正文仍只存于 Article，避免产生第二份内容事实。"""
+
+    __tablename__ = "book_sections"
+    __table_args__ = (UniqueConstraint("book_id", "order_index", name="uq_book_section_order"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    book_id: Mapped[int] = mapped_column(ForeignKey("books.id", ondelete="CASCADE"))
+    order_index: Mapped[int] = mapped_column(Integer)
+    title: Mapped[str] = mapped_column(String(500))
+    kind: Mapped[str] = mapped_column(String(32))
+    part_title: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+    book: Mapped["Book"] = relationship(back_populates="sections")
+    pages: Mapped[list["Article"]] = relationship(
+        back_populates="book_section", order_by="Article.order_index"
+    )
 
 
 class Article(Base):
     __tablename__ = "articles"
+    __table_args__ = (UniqueConstraint("book_id", "order_index", name="uq_book_page_order"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     title: Mapped[str] = mapped_column(String(500))
@@ -175,8 +214,13 @@ class Article(Base):
     # ⚠️ 书内顺序的唯一权威（§1.10）。任何地方要按书内顺序排一律用它，
     #    禁止拿 id 或 created_at 代替 —— 那两个只是碰巧接近，不是顺序。
     order_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    book_section_id: Mapped[int | None] = mapped_column(
+        ForeignKey("book_sections.id", ondelete="CASCADE"), nullable=True
+    )
+    book_page_layout: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
 
     book: Mapped["Book | None"] = relationship(back_populates="chapters")
+    book_section: Mapped["BookSection | None"] = relationship(back_populates="pages")
 
     sessions: Mapped[list["ReadingSession"]] = relationship(back_populates="article")
 
@@ -211,6 +255,9 @@ class ReadingSession(Base):
     marks: Mapped[list["Mark"]] = relationship(
         back_populates="session", cascade="all, delete-orphan"
     )
+    current_for_runs: Mapped[list["BookReadingRun"]] = relationship(
+        foreign_keys="BookReadingRun.current_session_id", back_populates="current_session"
+    )
 
 
 class Mark(Base):
@@ -240,10 +287,79 @@ class Mark(Base):
     # 冗余存一份原文和上下文，导出与查询时不必回头重新拼
     surface_text: Mapped[str] = mapped_column(Text)
     context: Mapped[str] = mapped_column(Text)
+    book_run_id: Mapped[int | None] = mapped_column(
+        ForeignKey("book_reading_runs.id", ondelete="SET NULL"), nullable=True
+    )
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
     session: Mapped["ReadingSession"] = relationship(back_populates="marks")
+    book_run: Mapped["BookReadingRun | None"] = relationship(back_populates="marks")
+
+
+class BookReadingRun(Base):
+    """一次由用户明确结束的连续阅读。关闭浏览器不会结束它。"""
+
+    __tablename__ = "book_reading_runs"
+    __table_args__ = (
+        Index(
+            "uq_active_book_run",
+            "user_id",
+            "book_id",
+            unique=True,
+            sqlite_where=text("ended_at IS NULL"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    book_id: Mapped[int] = mapped_column(ForeignKey("books.id", ondelete="CASCADE"))
+    current_session_id: Mapped[int | None] = mapped_column(
+        ForeignKey("reading_sessions.id", ondelete="SET NULL"), nullable=True
+    )
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    book: Mapped["Book"] = relationship(back_populates="reading_runs")
+    current_session: Mapped["ReadingSession | None"] = relationship(
+        foreign_keys=[current_session_id], back_populates="current_for_runs"
+    )
+    marks: Mapped[list["Mark"]] = relationship(back_populates="book_run")
+
+
+class ReviewBatch(Base):
+    __tablename__ = "review_batches"
+    __table_args__ = (UniqueConstraint("user_id", "request_key", name="uq_review_request"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    book_id: Mapped[int] = mapped_column(ForeignKey("books.id", ondelete="CASCADE"))
+    source_run_id: Mapped[int | None] = mapped_column(
+        ForeignKey("book_reading_runs.id", ondelete="SET NULL"), nullable=True
+    )
+    request_key: Mapped[str] = mapped_column(String(64))
+    markdown_snapshot: Mapped[str] = mapped_column(Text)
+    page_numbers: Mapped[list[int]] = mapped_column(JSON, default=list)
+    mark_count: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    handled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    items: Mapped[list["ReviewBatchItem"]] = relationship(
+        back_populates="batch", cascade="all, delete-orphan"
+    )
+
+
+class ReviewBatchItem(Base):
+    __tablename__ = "review_batch_items"
+    __table_args__ = (UniqueConstraint("batch_id", "mark_id", name="uq_batch_mark"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    batch_id: Mapped[int] = mapped_column(ForeignKey("review_batches.id", ondelete="CASCADE"))
+    mark_id: Mapped[int | None] = mapped_column(
+        ForeignKey("marks.id", ondelete="SET NULL"), nullable=True
+    )
+
+    batch: Mapped["ReviewBatch"] = relationship(back_populates="items")
 
 
 class AuthSession(Base):

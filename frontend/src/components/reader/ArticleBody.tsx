@@ -1,6 +1,7 @@
 import { Fragment } from 'react'
 import type { Mark, Pos } from '../../types'
 import { inRange, marksAt } from '../../lib/pos'
+import type { BookPageLayoutItem } from '../../api/client'
 
 interface Props {
   paragraphs: string[][]
@@ -8,6 +9,8 @@ interface Props {
   preview: { start: Pos; end: Pos } | null
   onWordClick: (pos: Pos) => void
   onWordHover: (pos: Pos) => void
+  layout?: BookPageLayoutItem[] | null
+  imageUrl?: (assetKey: string) => string
 }
 
 interface Flags {
@@ -21,10 +24,8 @@ const clsOf = (f: Flags, base: string) =>
     .filter(Boolean)
     .join(' ')
 
-export function ArticleBody({ paragraphs, marks, preview, onWordClick, onWordHover }: Props) {
-  return (
-    <div className="article-body">
-      {paragraphs.map((words, p) => {
+export function ArticleBody({ paragraphs, marks, preview, onWordClick, onWordHover, layout, imageUrl }: Props) {
+  const renderParagraph = (words: string[], p: number) => {
         // 先算出每个词的高亮状态，渲染时还要用它决定词间空格要不要一起高亮
         const flags: Flags[] = words.map((_, w) => {
           const pos = { p, w }
@@ -68,7 +69,28 @@ export function ArticleBody({ paragraphs, marks, preview, onWordClick, onWordHov
             })}
           </p>
         )
-      })}
+  }
+
+  return (
+    <div className="article-body">
+      {layout
+        ? layout.map((item, index) => {
+            if (item.type === 'paragraph') {
+              return renderParagraph(paragraphs[item.pIdx] ?? [], item.pIdx)
+            }
+            if (item.type === 'heading') {
+              return <h2 className="book-page-heading" key={`heading-${index}`}>{item.text}</h2>
+            }
+            return imageUrl ? (
+              <img
+                className="book-page-image"
+                key={`image-${index}`}
+                src={imageUrl(item.assetKey)}
+                alt="原书插图"
+              />
+            ) : null
+          })
+        : paragraphs.map(renderParagraph)}
     </div>
   )
 }

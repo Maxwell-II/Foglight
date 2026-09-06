@@ -8,6 +8,7 @@ import ReviewPage from './pages/ReviewPage'
 import AppActions from './components/AppActions'
 import RequireAuth from './components/RequireAuth'
 import LoginPage from './pages/LoginPage'
+import BookReviewPage from './pages/BookReviewPage'
 
 function NotFound() {
   return (
@@ -50,6 +51,7 @@ export default function App() {
           <Route path="/import" element={<ImportPage />} />
           <Route path="/books" element={<BooksPage />} />
           <Route path="/books/:bookId" element={<BookDetailPage />} />
+          <Route path="/books/:bookId/review" element={<BookReviewPage />} />
           <Route path="/read/:sessionId" element={<ReaderPage />} />
           <Route path="/review/:sessionId" element={<ReviewPage />} />
           <Route path="/index.html" element={<Navigate to="/" replace />} />

@@ -4,7 +4,13 @@ import {
   ApiError,
   exportBook,
   getBook,
+  getBookPages,
+  getBookToc,
+  openBookPage,
+  startBookReading,
   type BookDetailDto,
+  type BookPageSummaryDto,
+  type BookTocDto,
   type ChapterSummaryDto,
 } from '../api/client'
 import { openChapter } from '../components/BookNextChapter'
@@ -31,6 +37,9 @@ export default function BookDetailPage() {
   const [exportError, setExportError] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [toc, setToc] = useState<BookTocDto | null>(null)
+  const [expandedSection, setExpandedSection] = useState<number | null>(null)
+  const [sectionPages, setSectionPages] = useState<Record<number, BookPageSummaryDto[]>>({})
 
   useEffect(() => {
     let cancelled = false
@@ -47,6 +56,43 @@ export default function BookDetailPage() {
       cancelled = true
     }
   }, [bookId])
+
+  useEffect(() => {
+    if (book?.readingMode !== 'fixed_pages') return
+    getBookToc(book.id)
+      .then(setToc)
+      .catch((err: unknown) => setError(err instanceof ApiError ? err.message : '目录加载失败'))
+  }, [book])
+
+  const continueFixedBook = async (articleId?: number) => {
+    if (!book || book.readingMode !== 'fixed_pages') return
+    setOpeningId(articleId ?? -1)
+    try {
+      const run = await startBookReading(book.id)
+      const opened = await openBookPage(book.id, run.id, articleId ?? run.recommendedArticleId)
+      navigate(`/read/${opened.sessionId}?run=${run.id}`)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '打开书页失败，请重试。')
+      setOpeningId(null)
+    }
+  }
+
+  const toggleSection = async (sectionId: number) => {
+    if (!book) return
+    if (expandedSection === sectionId) {
+      setExpandedSection(null)
+      return
+    }
+    setExpandedSection(sectionId)
+    if (!sectionPages[sectionId]) {
+      try {
+        const pages = await getBookPages(book.id, sectionId)
+        setSectionPages((current) => ({ ...current, [sectionId]: pages }))
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : '书页列表加载失败')
+      }
+    }
+  }
 
   const openChapterCard = async (chapter: ChapterSummaryDto) => {
     setOpeningId(chapter.id)
@@ -98,6 +144,61 @@ export default function BookDetailPage() {
     return (
       <div className="wrap">
         <p className="dim">加载中…</p>
+      </div>
+    )
+  }
+
+  if (book.readingMode === 'fixed_pages') {
+    return (
+      <div className="wrap">
+        <Link className="back-link" to="/books">← 返回书架</Link>
+        <h1 className="title">{book.title}</h1>
+        <div className="meta">
+          {book.author ?? '佚名'} · 已读 {toc?.finishedPageCount ?? book.finishedPageCount}/
+          {toc?.pageCount ?? book.pageCount} 页 · 待回顾 {toc?.pendingReviewCount ?? book.pendingReviewCount} 处
+        </div>
+        {error && <p className="error-banner">{error}</p>}
+        <div className="book-fixed-actions">
+          <button className="btn-primary" disabled={openingId !== null} onClick={() => void continueFixedBook()}>
+            {openingId !== null ? '打开中…' : '继续阅读'}
+          </button>
+          <Link className="btn-secondary" to={`/books/${book.id}/review`}>
+            待回顾与历史批次
+          </Link>
+        </div>
+        {!toc && !error && <p className="dim">目录加载中…</p>}
+        {toc && (
+          <div className="book-toc">
+            {toc.sections.map((section, index) => (
+              <section className="book-toc-section" key={section.id}>
+                {section.partTitle && toc.sections[index - 1]?.partTitle !== section.partTitle && (
+                  <h2 className="book-part-title">{section.partTitle}</h2>
+                )}
+                <button className="book-toc-row" onClick={() => void toggleSection(section.id)}>
+                  <span>{section.title}</span>
+                  <span className="dim">
+                    第 {section.firstPage}–{section.lastPage} 页 · 已读 {section.finishedPageCount}/{section.pageCount}
+                  </span>
+                </button>
+                {expandedSection === section.id && (
+                  <div className="book-page-list">
+                    {(sectionPages[section.id] ?? []).map((page) => (
+                      <button
+                        key={page.articleId}
+                        className="book-page-row"
+                        disabled={openingId !== null}
+                        onClick={() => void continueFixedBook(page.articleId)}
+                      >
+                        第 {page.pageNumber} 页 · {page.wordCount} 词
+                        {page.isRead ? ' · 已读' : ''}{page.markCount ? ` · ${page.markCount} 处标记` : ''}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </section>
+            ))}
+          </div>
+        )}
       </div>
     )
   }

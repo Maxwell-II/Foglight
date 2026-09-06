@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ApiError, listBooks, type BookSummaryDto } from '../api/client'
+import { ApiError, listBooks, openBookPage, startBookReading, type BookSummaryDto } from '../api/client'
 import { openChapterById } from '../components/BookNextChapter'
 
 /**
@@ -32,10 +32,16 @@ export default function BooksPage() {
   }, [])
 
   const startNext = async (book: BookSummaryDto) => {
-    if (!book.nextChapter) return
     setOpeningId(book.id)
     setError(null)
     try {
+      if (book.readingMode === 'fixed_pages') {
+        const run = await startBookReading(book.id)
+        const opened = await openBookPage(book.id, run.id, run.recommendedArticleId)
+        navigate(`/read/${opened.sessionId}?run=${run.id}`)
+        return
+      }
+      if (!book.nextChapter) return
       navigate(`/read/${await openChapterById(book.nextChapter.articleId)}`)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '打开章节失败，请重试。')
@@ -63,7 +69,7 @@ export default function BooksPage() {
       {books && books.length > 0 && (
         <ul className="article-grid">
           {books.map((b) => {
-            const done = b.nextChapter === null
+            const done = b.readingMode === 'legacy_chapters' && b.nextChapter === null
             return (
               <li key={b.id} className="article-card">
                 <button
@@ -73,19 +79,22 @@ export default function BooksPage() {
                 >
                   <h2 className="article-card__title">{b.title}</h2>
                   <div className="article-card__meta">
-                    {b.author ?? '佚名'} · 已读 {b.finishedChapterCount}/{b.chapterCount} 章 · 共标了{' '}
-                    {b.totalMarks} 处
+                    {b.author ?? '佚名'} · {b.readingMode === 'fixed_pages'
+                      ? `已读 ${b.finishedPageCount}/${b.pageCount} 页 · 待回顾 ${b.pendingReviewCount} 处`
+                      : `已读 ${b.finishedChapterCount}/${b.chapterCount} 章 · 共标了 ${b.totalMarks} 处`}
                   </div>
                   <div className="book-card__next">
                     {done
                       ? '整本读完了'
-                      : `继续读：第 ${b.nextChapter!.orderIndex} 章 ${b.nextChapter!.title} →`}
+                      : b.readingMode === 'fixed_pages'
+                        ? '继续阅读 →'
+                        : `继续读：第 ${b.nextChapter!.orderIndex} 章 ${b.nextChapter!.title} →`}
                   </div>
                   {openingId === b.id && <div className="dim">打开中…</div>}
                 </button>
                 {/* 必须放在 button 外面：HTML 不允许 button 里再嵌可交互元素 */}
                 <Link className="article-card__marks" to={`/books/${b.id}`}>
-                  目录（{b.chapterCount} 章）→
+                  目录（{b.readingMode === 'fixed_pages' ? `${b.pageCount} 页` : `${b.chapterCount} 章`}）→
                 </Link>
               </li>
             )

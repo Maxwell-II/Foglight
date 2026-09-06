@@ -32,12 +32,17 @@ class MarkView(Protocol):
     surface_text: str
 
 
-def _context_for(paragraphs: list[list[str]], p: int) -> str:
-    """取标记所在段落作为上下文，太长就截断。对应 export.ts 的 contextFor。"""
+def _context_for(paragraphs: list[list[str]], p: int, w: int = 0) -> str:
+    """取标记附近上下文；长段不能截掉真正被标记的词。"""
     if p < 0 or p >= len(paragraphs):
         return ""
     raw = " ".join(paragraphs[p])
-    return f"{raw[:_CONTEXT_MAX_CHARS]}…" if len(raw) > _CONTEXT_MAX_CHARS else raw
+    if len(raw) <= _CONTEXT_MAX_CHARS:
+        return raw
+    word_start = sum(len(word) + 1 for word in paragraphs[p][: max(0, w)])
+    start = max(0, min(word_start - _CONTEXT_MAX_CHARS // 2, len(raw) - _CONTEXT_MAX_CHARS))
+    excerpt = raw[start : start + _CONTEXT_MAX_CHARS]
+    return ("…" if start else "") + excerpt + ("…" if start + _CONTEXT_MAX_CHARS < len(raw) else "")
 
 
 def _sort_key(mark: MarkView) -> tuple[int, int]:
@@ -74,7 +79,7 @@ def build_markdown(
     if not unknown:
         lines.append("（无）")
     for m in unknown:
-        context = _context_for(paragraphs, m.start_paragraph_idx)
+        context = _context_for(paragraphs, m.start_paragraph_idx, m.start_word_idx)
         lines.append(f"- **{m.surface_text}** — 所在段落：{context}")
     lines.append("")
 
@@ -83,7 +88,7 @@ def build_markdown(
     if not unclear:
         lines.append("（无）")
     for m in unclear:
-        context = _context_for(paragraphs, m.start_paragraph_idx)
+        context = _context_for(paragraphs, m.start_paragraph_idx, m.start_word_idx)
         lines.append(f'- **"{m.surface_text}"** — 所在段落：{context}')
     lines.append("")
 
@@ -113,6 +118,7 @@ class BookChapterView:
     source: str
     paragraphs: list[list[str]]
     marks: Sequence[MarkView]
+    layout: list[dict] | None = None
 
 
 def _strip_closing(markdown: str) -> str:
@@ -225,4 +231,49 @@ def build_book_markdown(
     lines.append("---")
     lines.append(_CLOSING_INSTRUCTION)
 
+    return "\n".join(lines)
+
+
+def build_page_review_markdown(
+    *,
+    book_title: str,
+    author: str | None,
+    content_key: str | None,
+    pages: Sequence[BookChapterView],
+) -> str:
+    """Render an exact, immutable selection of fixed pages and their marks."""
+    page_numbers = [page.order_index for page in pages]
+    lines = [f"# 阅读复盘素材：《{book_title}》", ""]
+    if author:
+        lines.append(f"作者：{author}")
+    if content_key:
+        lines.append(f"内容版本：{content_key[:12]}")
+    lines.append("页面：" + "、".join(str(number) for number in page_numbers))
+    lines.append("")
+    for page in pages:
+        lines.extend([f"## 第 {page.order_index} 页：{page.title}", "", "### 原文", ""])
+        for words in page.paragraphs:
+            lines.extend([" ".join(words), ""])
+        unknown = sorted((m for m in page.marks if m.type == "unknown_word"), key=_sort_key)
+        unclear = sorted((m for m in page.marks if m.type == "unclear"), key=_sort_key)
+        lines.extend(["### 本次选择的陌生词", ""])
+        for mark in unknown:
+            lines.append(
+                f"- **{mark.surface_text}** — 所在段落："
+                f"{_context_for(page.paragraphs, mark.start_paragraph_idx, mark.start_word_idx)}"
+            )
+        if not unknown:
+            lines.append("（无）")
+        lines.extend(["", "### 本次选择的模糊处", ""])
+        for mark in unclear:
+            lines.append(
+                f'- **"{mark.surface_text}"** — 所在段落：'
+                f"{_context_for(page.paragraphs, mark.start_paragraph_idx, mark.start_word_idx)}"
+            )
+        if not unclear:
+            lines.append("（无）")
+        lines.append("")
+        if any(item.get("type") == "image" for item in getattr(page, "layout", []) or []):
+            lines.extend(["> 本页含原书插图，请结合阅读页面查看。", ""])
+    lines.extend(["---", _CLOSING_INSTRUCTION])
     return "\n".join(lines)

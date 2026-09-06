@@ -72,6 +72,24 @@ export interface ArticleDetailDto extends ArticleSummaryDto {
   license: string
   redistributable: boolean
   bodyParagraphs: string[][]
+  bookPageLayout: BookPageLayoutItem[] | null
+  bookContext: BookPageContextDto | null
+}
+
+export type BookPageLayoutItem =
+  | { type: 'paragraph'; pIdx: number }
+  | { type: 'heading'; text: string }
+  | { type: 'image'; assetKey: string }
+
+export interface BookPageContextDto {
+  bookId: number
+  readingMode: string
+  sectionId: number
+  sectionTitle: string
+  pageNumber: number
+  pageCount: number
+  previousArticleId: number | null
+  nextArticleId: number | null
 }
 
 export interface MarkDto {
@@ -109,6 +127,7 @@ export interface MarkCreatePayload {
   endWordIdx: number
   surfaceText: string
   context?: string
+  bookRunId?: number
 }
 
 export type ParagraphMode = 'blank_line' | 'single_line'
@@ -206,6 +225,10 @@ export interface BookSummaryDto {
   totalMarks: number
   /** order_index 最小的、尚未读完的那一章；整本读完为 null */
   nextChapter: { articleId: number; title: string; orderIndex: number } | null
+  readingMode: 'legacy_chapters' | 'fixed_pages'
+  pageCount: number
+  finishedPageCount: number
+  pendingReviewCount: number
 }
 
 export interface BookDetailDto extends BookSummaryDto {
@@ -218,6 +241,131 @@ export function listBooks(): Promise<BookSummaryDto[]> {
 
 export function getBook(bookId: number): Promise<BookDetailDto> {
   return request(`/books/${bookId}`)
+}
+
+export interface BookSectionDto {
+  id: number
+  orderIndex: number
+  title: string
+  kind: string
+  partTitle: string | null
+  firstPage: number
+  lastPage: number
+  pageCount: number
+  finishedPageCount: number
+}
+
+export interface BookTocDto {
+  bookId: number
+  title: string
+  author: string | null
+  pageCount: number
+  finishedPageCount: number
+  pendingReviewCount: number
+  activeRunId: number | null
+  resumeArticleId: number | null
+  sections: BookSectionDto[]
+}
+
+export interface BookPageSummaryDto {
+  articleId: number
+  pageNumber: number
+  title: string
+  wordCount: number
+  isRead: boolean
+  markCount: number
+}
+
+export interface ReadingRunDto {
+  id: number
+  bookId: number
+  currentSessionId: number | null
+  recommendedArticleId: number
+  startedAt: string
+  endedAt: string | null
+}
+
+export interface ReviewCandidateMarkDto {
+  id: number
+  type: MarkType
+  surfaceText: string
+  startParagraphIdx: number
+  startWordIdx: number
+}
+
+export interface ReviewCandidatePageDto {
+  articleId: number
+  pageNumber: number
+  sectionTitle: string
+  currentMarks: ReviewCandidateMarkDto[]
+  earlierMarks: ReviewCandidateMarkDto[]
+}
+
+export interface ReviewBatchSummaryDto {
+  id: number
+  pageNumbers: number[]
+  markCount: number
+  createdAt: string
+  handledAt: string | null
+}
+
+export interface ReviewCandidatesDto {
+  runId: number | null
+  pages: ReviewCandidatePageDto[]
+  openBatches: ReviewBatchSummaryDto[]
+}
+
+export interface ReviewBatchDto extends ReviewBatchSummaryDto {
+  bookId: number
+  markdown: string
+}
+
+export function getBookToc(bookId: number): Promise<BookTocDto> {
+  return request(`/books/${bookId}/toc`)
+}
+
+export function getBookPages(bookId: number, sectionId: number): Promise<BookPageSummaryDto[]> {
+  return request(`/books/${bookId}/pages?sectionId=${sectionId}`)
+}
+
+export function startBookReading(bookId: number): Promise<ReadingRunDto> {
+  return request(`/books/${bookId}/reading-runs`, { method: 'POST' })
+}
+
+export function openBookPage(bookId: number, runId: number, articleId: number) {
+  return request<{ runId: number; sessionId: number; bookContext: BookPageContextDto }>(
+    `/books/${bookId}/reading-runs/${runId}/open-page`,
+    { method: 'POST', body: JSON.stringify({ articleId }) },
+  )
+}
+
+export function finishBookReading(bookId: number, runId: number) {
+  return request<{ runId: number; bookId: number; pendingCount: number }>(
+    `/books/${bookId}/reading-runs/${runId}/finish`,
+    { method: 'POST' },
+  )
+}
+
+export function getReviewCandidates(bookId: number, runId?: number): Promise<ReviewCandidatesDto> {
+  return request(`/books/${bookId}/review-candidates${runId ? `?runId=${runId}` : ''}`)
+}
+
+export function createReviewBatch(
+  bookId: number,
+  payload: { runId?: number; markIds: number[]; requestKey: string },
+): Promise<ReviewBatchDto> {
+  return request(`/books/${bookId}/review-batches`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function getReviewBatch(bookId: number, batchId: number): Promise<ReviewBatchDto> {
+  return request(`/books/${bookId}/review-batches/${batchId}`)
+}
+
+export function handleReviewBatch(bookId: number, batchId: number): Promise<ReviewBatchSummaryDto> {
+  return request(`/books/${bookId}/review-batches/${batchId}/handle`, { method: 'POST' })
 }
 
 /** 章节区间是闭区间，按 orderIndex；省略则整本。纯文本 Markdown，同样不走 request()。 */
@@ -314,9 +462,19 @@ export function toMark(dto: MarkDto): Mark {
 const CONTEXT_MAX_CHARS = 240
 
 /** 前端 Mark → 建标记的请求体。context 用标记起点所在段落，截断规则和后端 export.py 的 _context_for 一致。 */
-export function toMarkCreatePayload(mark: Mark, paragraphs: string[][]): MarkCreatePayload {
+export function toMarkCreatePayload(
+  mark: Mark,
+  paragraphs: string[][],
+  bookRunId?: number,
+): MarkCreatePayload {
   const raw = paragraphs[mark.start.p]?.join(' ') ?? ''
-  const context = raw.length > CONTEXT_MAX_CHARS ? `${raw.slice(0, CONTEXT_MAX_CHARS)}…` : raw
+  const words = paragraphs[mark.start.p] ?? []
+  const wordStart = words.slice(0, mark.start.w).reduce((total, word) => total + word.length + 1, 0)
+  const start = Math.max(0, Math.min(wordStart - CONTEXT_MAX_CHARS / 2, raw.length - CONTEXT_MAX_CHARS))
+  const context =
+    raw.length > CONTEXT_MAX_CHARS
+      ? `${start > 0 ? '…' : ''}${raw.slice(start, start + CONTEXT_MAX_CHARS)}${start + CONTEXT_MAX_CHARS < raw.length ? '…' : ''}`
+      : raw
   return {
     type: mark.type,
     startParagraphIdx: mark.start.p,
@@ -325,5 +483,6 @@ export function toMarkCreatePayload(mark: Mark, paragraphs: string[][]): MarkCre
     endWordIdx: mark.end.w,
     surfaceText: mark.text,
     context,
+    ...(bookRunId === undefined ? {} : { bookRunId }),
   }
 }

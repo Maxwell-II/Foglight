@@ -12,13 +12,24 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import func, or_
 
 from app.deps import CurrentUser, DbSession
-from app.models import Article, Book, License, Mark, ReadingSession, SessionStatus, SourceType
+from app.models import (
+    Article,
+    Book,
+    BookReadingMode,
+    BookSection,
+    License,
+    Mark,
+    ReadingSession,
+    SessionStatus,
+    SourceType,
+)
 from app.schemas import (
     ArticleDetail,
     ArticleImportText,
     ArticlePreviewRequest,
     ArticlePreviewResponse,
     ArticleSummary,
+    BookPageContext,
     EpubImportCandidate,
 )
 from app.services.epub import parse_epub
@@ -114,7 +125,9 @@ def _get_visible_article(db: DbSession, article_id: int, user_id: int) -> Articl
 def list_articles(db: DbSession, user: CurrentUser) -> list[Article]:
     articles = (
         db.query(Article)
+        .outerjoin(Book, Book.id == Article.book_id)
         .filter(or_(Article.created_by.is_(None), Article.created_by == user.id))
+        .filter(or_(Book.id.is_(None), Book.reading_mode != BookReadingMode.FIXED_PAGES))
         .order_by(Article.created_at.desc())
         .all()
     )
@@ -124,6 +137,28 @@ def list_articles(db: DbSession, user: CurrentUser) -> list[Article]:
 @router.get("/articles/{article_id}", response_model=ArticleDetail)
 def get_article(article_id: int, db: DbSession, user: CurrentUser) -> Article:
     article = _get_visible_article(db, article_id, user.id)
+    article.book_context = None
+    if article.book_id is not None:
+        book = db.get(Book, article.book_id)
+        if book is not None and book.reading_mode == BookReadingMode.FIXED_PAGES:
+            section = db.get(BookSection, article.book_section_id)
+            pages = (
+                db.query(Article.id, Article.order_index)
+                .filter(Article.book_id == book.id)
+                .order_by(Article.order_index)
+                .all()
+            )
+            position = next(i for i, row in enumerate(pages) if row.id == article.id)
+            article.book_context = BookPageContext(
+                book_id=book.id,
+                reading_mode=book.reading_mode,
+                section_id=section.id,
+                section_title=section.title,
+                page_number=article.order_index,
+                page_count=len(pages),
+                previous_article_id=pages[position - 1].id if position > 0 else None,
+                next_article_id=pages[position + 1].id if position + 1 < len(pages) else None,
+            )
     return _attach_session_state(db, [article], user.id)[0]
 
 

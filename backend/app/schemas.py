@@ -69,6 +69,8 @@ class ArticleDetail(ArticleSummary):
     license: str
     redistributable: bool
     body_paragraphs: list[list[str]]
+    book_page_layout: list[dict] | None = None
+    book_context: "BookPageContext | None" = None
 
 
 class EpubImportCandidate(ApiModel):
@@ -125,6 +127,7 @@ class MarkCreate(ApiModel):
     end_word_idx: int = Field(ge=0)
     surface_text: str
     context: str = ""
+    book_run_id: int | None = None
 
 
 class MarkOut(MarkCreate):
@@ -202,9 +205,127 @@ class BookSummary(ApiModel):
     # 不是「最近一次」的数 —— 那个是章级的 lastMarksCount。
     total_marks: int
     next_chapter: BookNextChapter | None = None
+    reading_mode: str = "legacy_chapters"
+    page_count: int = 0
+    finished_page_count: int = 0
+    pending_review_count: int = 0
 
 
 class BookDetail(BookSummary):
     """目录页用，带上按 order_index 排好的章节。"""
 
     chapters: list[ChapterSummary] = Field(default_factory=list)
+
+
+class BookPageContext(ApiModel):
+    book_id: int
+    reading_mode: str
+    section_id: int
+    section_title: str
+    page_number: int
+    page_count: int
+    previous_article_id: int | None = None
+    next_article_id: int | None = None
+
+
+class BookSectionOut(ApiModel):
+    id: int
+    order_index: int
+    title: str
+    kind: str
+    part_title: str | None = None
+    first_page: int
+    last_page: int
+    page_count: int
+    finished_page_count: int
+
+
+class BookToc(ApiModel):
+    book_id: int
+    title: str
+    author: str | None = None
+    page_count: int
+    finished_page_count: int
+    pending_review_count: int
+    active_run_id: int | None = None
+    resume_article_id: int | None = None
+    sections: list[BookSectionOut]
+
+
+class BookPageSummary(ApiModel):
+    article_id: int
+    page_number: int
+    title: str
+    word_count: int
+    is_read: bool
+    mark_count: int
+
+
+class ReadingRunOut(ApiModel):
+    id: int
+    book_id: int
+    current_session_id: int | None = None
+    recommended_article_id: int
+    started_at: datetime
+    ended_at: datetime | None = None
+
+
+class OpenBookPage(ApiModel):
+    article_id: int
+
+
+class OpenBookPageResult(ApiModel):
+    run_id: int
+    session_id: int
+    book_context: BookPageContext
+
+
+class FinishReadingRunResult(ApiModel):
+    run_id: int
+    book_id: int
+    pending_count: int
+
+
+class ReviewCandidateMark(ApiModel):
+    id: int
+    type: str
+    surface_text: str
+    start_paragraph_idx: int
+    start_word_idx: int
+
+
+class ReviewCandidatePage(ApiModel):
+    article_id: int
+    page_number: int
+    section_title: str
+    current_marks: list[ReviewCandidateMark] = Field(default_factory=list)
+    earlier_marks: list[ReviewCandidateMark] = Field(default_factory=list)
+
+
+class ReviewCandidateResponse(ApiModel):
+    run_id: int | None = None
+    pages: list[ReviewCandidatePage]
+    open_batches: list["ReviewBatchSummary"]
+
+
+class ReviewBatchCreate(ApiModel):
+    run_id: int | None = None
+    mark_ids: list[int] = Field(min_length=1)
+    request_key: str = Field(min_length=8, max_length=64)
+
+
+class ReviewBatchSummary(ApiModel):
+    id: int
+    page_numbers: list[int]
+    mark_count: int
+    created_at: datetime
+    handled_at: datetime | None = None
+
+
+class ReviewBatchDetail(ReviewBatchSummary):
+    book_id: int
+    markdown: str
+
+
+ArticleDetail.model_rebuild()
+ReviewCandidateResponse.model_rebuild()

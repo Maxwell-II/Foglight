@@ -478,6 +478,37 @@ kbd {
 .book-export__range .field { flex-direction: column; }
 .book-export__range input { width: 90px; }
 
+/* ---------- Wave 3B：固定书页、原书目录与回顾批次 ---------- */
+.book-fixed-actions,
+.book-page-nav { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 14px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-decoration: none;
+}
+.btn-secondary:disabled { opacity: 0.5; }
+.book-toc { margin-top: 24px; border-top: 1px solid var(--line); }
+.book-toc-section { border-bottom: 1px solid var(--line); padding: 12px 0; }
+.book-part-title { font-size: 13px; color: var(--dim); margin: 18px 0 8px; text-transform: uppercase; }
+.book-toc-row { width: 100%; display: flex; justify-content: space-between; gap: 16px; text-align: left; background: none; border: 0; color: var(--ink); padding: 6px 0; }
+.book-page-list { display: grid; gap: 6px; margin: 8px 0 4px 16px; }
+.book-page-row { text-align: left; border: 0; background: none; color: var(--dim); padding: 5px 0; }
+.book-page-heading { font-size: 18px; margin: 30px 0 12px; }
+.book-page-image { display: block; max-width: min(100%, 620px); max-height: 70vh; object-fit: contain; margin: 28px auto; }
+.book-page-nav { justify-content: space-between; border-top: 1px solid var(--line); padding-top: 20px; margin-top: 36px; }
+.review-open-batches,
+.review-page-choice { border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin: 12px 0; }
+.review-open-batches { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.review-open-batches h2,
+.review-page-choice h2 { font-size: 15px; margin: 0 0 10px; }
+.review-page-choice label { display: block; margin: 7px 0; color: var(--dim); }
+
 /* ---------- 窄屏 ----------
    在这条之前，整个项目一条宽度断点都没有（唯一的 @media 是配色）。
    手机上 toolbar 那一行 4 个子项挤在 390px 里，直接被压垮。 */
@@ -515,4 +546,5 @@ kbd {
   .wrap { padding: 20px 16px 100px; }
 
   .logout-btn { padding: 0 10px; font-size: 12px; }
+  .book-toc-row { flex-direction: column; gap: 4px; }
 }

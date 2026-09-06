@@ -6,6 +6,7 @@ interface Props {
   counts: { unknown: number; unclear: number }
   onSetPen: (pen: Pen) => void
   onFinish: () => void
+  finishLabel?: string
 }
 
 /** 模式化的界面必须让人一眼看出「现在处于什么状态」，否则点下去不知道会发生什么。 */
@@ -20,7 +21,7 @@ function hintFor(state: MarkingState): string {
   }
 }
 
-export function PenToolbar({ pen, state, counts, onSetPen, onFinish }: Props) {
+export function PenToolbar({ pen, state, counts, onSetPen, onFinish, finishLabel = '完成阅读' }: Props) {
   return (
     <div className={`toolbar toolbar--${pen} ${state.kind === 'extending' ? 'is-extending' : ''}`}>
       <div className="pens">
@@ -45,7 +46,7 @@ export function PenToolbar({ pen, state, counts, onSetPen, onFinish }: Props) {
           <b>{counts.unknown}</b> 词 · <b>{counts.unclear}</b> 处
         </span>
         <button className="btn-primary" onClick={onFinish}>
-          完成阅读
+          {finishLabel}
         </button>
       </div>
     </div>

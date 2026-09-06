@@ -2,9 +2,13 @@ import type { Article, Mark } from '../types'
 import { cmp } from './pos'
 
 /** 取标记所在段落作为上下文，太长就截断。 */
-function contextFor(article: Article, p: number): string {
+function contextFor(article: Article, p: number, w: number): string {
   const raw = article.paragraphs[p]?.join(' ') ?? ''
-  return raw.length > 240 ? `${raw.slice(0, 240)}…` : raw
+  if (raw.length <= 240) return raw
+  const words = article.paragraphs[p] ?? []
+  const wordStart = words.slice(0, w).reduce((total, word) => total + word.length + 1, 0)
+  const start = Math.max(0, Math.min(wordStart - 120, raw.length - 240))
+  return `${start > 0 ? '…' : ''}${raw.slice(start, start + 240)}${start + 240 < raw.length ? '…' : ''}`
 }
 
 /**
@@ -33,7 +37,7 @@ export function buildMarkdown(article: Article, marks: Mark[]): string {
   lines.push('')
   if (unknown.length === 0) lines.push('（无）')
   unknown.forEach((m) => {
-    lines.push(`- **${m.text}** — 所在段落：${contextFor(article, m.start.p)}`)
+    lines.push(`- **${m.text}** — 所在段落：${contextFor(article, m.start.p, m.start.w)}`)
   })
   lines.push('')
 
@@ -41,7 +45,7 @@ export function buildMarkdown(article: Article, marks: Mark[]): string {
   lines.push('')
   if (unclear.length === 0) lines.push('（无）')
   unclear.forEach((m) => {
-    lines.push(`- **"${m.text}"** — 所在段落：${contextFor(article, m.start.p)}`)
+    lines.push(`- **"${m.text}"** — 所在段落：${contextFor(article, m.start.p, m.start.w)}`)
   })
   lines.push('')
 
