@@ -18,8 +18,12 @@ frontend/src/sampleArticles.json
 # 粘贴导入的短文正文，来源不明确的版权文本，同上原则不入库（W2）
 seed/texts/
 
-# Locally prepared copyrighted books and their extracted assets.
-seed/book-data/
+# Prepared books are ignored by default. Explicitly reviewed private packages
+# are allowlisted below so another machine can perform the same incremental load.
+seed/book-data/*
+!seed/book-data/deploy.txt
+!seed/book-data/bb41d4feb06815531195e5051047f7587cc2b0c5904fa8936b90b3e550caa1ce/
+!seed/book-data/bb41d4feb06815531195e5051047f7587cc2b0c5904fa8936b90b3e550caa1ce/**
 backend/book-assets/
 
 backend/reading.db.before-password-reset-20260906-172926

@@ -1,0 +1,4 @@
+# A prepared page file is generated and can contain the full book on one line.
+# Keep it versioned, but do not make normal reviews render a multi-megabyte diff.
+seed/book-data/*/pages.json -diff
+seed/book-data/*/assets/* binary
