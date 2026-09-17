@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import func, or_
 
 from app.deps import CurrentUser, DbSession
+from app.visibility import article_visible_to, visible_articles, visible_books
 from app.models import (
     Article,
     Book,
@@ -114,9 +115,9 @@ def _attach_session_state(db: DbSession, articles: list[Article], user_id: int) 
 
 
 def _get_visible_article(db: DbSession, article_id: int, user_id: int) -> Article:
-    """curated（created_by 为空）对所有人可见；用户自己导入的只对自己可见。"""
+    """规则见 app/visibility.py —— 那里是唯一权威，这里不重写一遍。"""
     article = db.get(Article, article_id)
-    if article is None or (article.created_by is not None and article.created_by != user_id):
+    if article is None or not article_visible_to(article, user_id):
         raise HTTPException(status_code=404, detail="文章不存在")
     return article
 
@@ -126,7 +127,7 @@ def list_articles(db: DbSession, user: CurrentUser) -> list[Article]:
     articles = (
         db.query(Article)
         .outerjoin(Book, Book.id == Article.book_id)
-        .filter(or_(Article.created_by.is_(None), Article.created_by == user.id))
+        .filter(visible_articles(user.id))
         .filter(or_(Book.id.is_(None), Book.reading_mode != BookReadingMode.FIXED_PAGES))
         .order_by(Article.created_at.desc())
         .all()
@@ -241,10 +242,7 @@ async def import_epub(
     # 哪本上有他的标记，而标记是这个产品唯一不可再生的数据。
     existing = (
         db.query(Book)
-        .filter(
-            Book.title == resolved_book_title,
-            or_(Book.created_by.is_(None), Book.created_by == user.id),
-        )
+        .filter(Book.title == resolved_book_title, visible_books(user.id))
         .first()
     )
     if existing is not None:

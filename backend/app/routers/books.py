@@ -26,6 +26,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 
 from app.deps import CurrentUser, DbSession
+from app.visibility import visible_books
 from app.config import settings
 from app.models import (
     Article,
@@ -70,8 +71,8 @@ router = APIRouter(tags=["books"])
 
 
 def _visible_books(db: DbSession, user_id: int):
-    """和文章同一套可见性：curated（created_by 为空）对所有人可见，自己导入的只对自己可见。"""
-    return db.query(Book).filter(or_(Book.created_by.is_(None), Book.created_by == user_id))
+    """规则见 app/visibility.py —— 那里是唯一权威，这里不重写一遍。"""
+    return db.query(Book).filter(visible_books(user_id))
 
 
 def _get_visible_book(db: DbSession, book_id: int, user_id: int) -> Book:
