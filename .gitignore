@@ -26,5 +26,5 @@ seed/book-data/*
 !seed/book-data/bb41d4feb06815531195e5051047f7587cc2b0c5904fa8936b90b3e550caa1ce/**
 backend/book-assets/
 
-backend/reading.db.before-password-reset-20260906-172926
-backend/reading.db.before-wave3b-migration-20260906-174229
+# 迁移前的数据库快照。文件名以日期结尾，匹配不上上面的 *.db
+backend/reading.db.before-*

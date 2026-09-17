@@ -97,12 +97,20 @@ def fetch_article(url: str) -> Segment:
         raise FetchError(f"未能提取标题：{url}")
 
     headings = scope.find_all(["h2", "h3"])
-    if headings:
+    if len(headings) >= 2:
         # 已验证过的行为，一点不能变：多个小标题的公共祖先当正文容器。
         container = _common_ancestor(headings)
     else:
         # 短文按定义就没有小标题——正因为没有小标题它才短。回退到 readability
         # 的通用正文提取，不再把"没有 h2/h3"当成失败。
+        #
+        # ⚠️ 条件是 `>= 2` 而不是 `if headings`，这一个字的差别曾经让整批短文
+        #    静默消失：`_common_ancestor` 需要至少两个节点才能算出真正包住正文的
+        #    祖先，**只有一个 h2 时它返回那个 h2 自己**，里面一个 <p> 都没有，
+        #    于是下面抛"正文提取为空"。而"全篇只有一个小标题"恰恰是短文和中等
+        #    长度博客最常见的形状，所以这个缺口是**系统性只吃掉短文**的。
+        #    实测（2026-09-16，zenhabits.net 随机 30 篇）：修前成功 13 篇且
+        #    short(<400 词) = 0；修后 30 篇全部成功，其中 short = 9。
         container = _fallback_container(html, url)
 
     _strip_noise(container)
