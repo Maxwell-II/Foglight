@@ -103,7 +103,11 @@ export default function LoginPage() {
 
   return (
     <div className="wrap login-wrap">
-      <h1 className="title login-title">登录</h1>
+      <div className="brand">
+        Foglight <span className="brand__sub">雾灯</span>
+      </div>
+
+      <h1 className="title login-title" style={{ marginTop: 32 }}>登录</h1>
       <p className="dim login-sub">这是私人阅读器，账号由命令行建，不开放注册。</p>
 
       {error && (
@@ -112,63 +116,65 @@ export default function LoginPage() {
         </div>
       )}
 
-      <form className="import-form login-form" onSubmit={onSubmit}>
-        <label className="field">
-          邮箱
-          <input
-            type="email"
-            value={email}
-            autoComplete="username"
-            autoFocus
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </label>
+      <div className="login-card">
+        <form className="import-form login-form" onSubmit={onSubmit}>
+          <label className="field">
+            邮箱
+            <input
+              type="email"
+              value={email}
+              autoComplete="username"
+              autoFocus
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </label>
 
-        <label className="field">
-          密码
-          <input
-            type="password"
-            value={password}
-            autoComplete="current-password"
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </label>
+          <label className="field">
+            密码
+            <input
+              type="password"
+              value={password}
+              autoComplete="current-password"
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </label>
 
-        {needsCaptcha && (
-          <div className="field">
-            验证码
-            <div className="captcha-row">
-              {captcha ? (
-                <button
-                  type="button"
-                  className="captcha-image"
-                  onClick={refreshCaptcha}
-                  title="点击换一张"
-                  aria-label="验证码图片，点击换一张"
-                  dangerouslySetInnerHTML={{ __html: captcha.svg }}
+          {needsCaptcha && (
+            <div className="field">
+              验证码
+              <div className="captcha-row">
+                {captcha ? (
+                  <button
+                    type="button"
+                    className="captcha-image"
+                    onClick={refreshCaptcha}
+                    title="点击换一张"
+                    aria-label="验证码图片，点击换一张"
+                    dangerouslySetInnerHTML={{ __html: captcha.svg }}
+                  />
+                ) : (
+                  <button type="button" className="captcha-image is-empty" onClick={refreshCaptcha}>
+                    点击加载
+                  </button>
+                )}
+                <input
+                  className="captcha-input"
+                  value={captchaAnswer}
+                  maxLength={8}
+                  autoComplete="off"
+                  spellCheck={false}
+                  onChange={(e) => setCaptchaAnswer(e.target.value)}
                 />
-              ) : (
-                <button type="button" className="captcha-image is-empty" onClick={refreshCaptcha}>
-                  点击加载
-                </button>
-              )}
-              <input
-                className="captcha-input"
-                value={captchaAnswer}
-                maxLength={8}
-                autoComplete="off"
-                spellCheck={false}
-                onChange={(e) => setCaptchaAnswer(e.target.value)}
-              />
+              </div>
+              <span className="captcha-hint">不区分大小写。看不清就点图片换一张。</span>
             </div>
-            <span className="captcha-hint">不区分大小写。看不清就点图片换一张。</span>
-          </div>
-        )}
+          )}
 
-        <button className="btn-primary login-submit" type="submit" disabled={submitting || locked}>
-          {locked ? `已锁定 ${formatCountdown(lockedFor)}` : submitting ? '登录中…' : '登录'}
-        </button>
-      </form>
+          <button className="btn-primary login-submit" type="submit" disabled={submitting || locked}>
+            {locked ? `已锁定 ${formatCountdown(lockedFor)}` : submitting ? '登录中…' : '登录'}
+          </button>
+        </form>
+      </div>
     </div>
   )
 }

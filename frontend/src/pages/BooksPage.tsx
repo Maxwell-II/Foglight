@@ -51,6 +51,12 @@ export default function BooksPage() {
 
   return (
     <div className="wrap">
+      <div className="site-header">
+        <span className="brand">
+          Foglight <span className="brand__sub">雾灯</span>
+        </span>
+      </div>
+
       <div className="library-header">
         <h1 className="title">书架</h1>
         <Link className="back-link" to="/">

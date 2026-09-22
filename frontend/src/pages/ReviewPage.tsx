@@ -86,9 +86,15 @@ export default function ReviewPage() {
 
   return (
     <div className="wrap">
-      <Link className="back-link" to="/">
-        ← 返回文章库
-      </Link>
+      <div className="site-header">
+        <span className="brand">
+          Foglight <span className="brand__sub">雾灯</span>
+        </span>
+        <Link className="back-link" to="/">
+          ← 返回文章库
+        </Link>
+      </div>
+
       <h1 className="title">复盘：{article.title}</h1>
       <div className="meta">
         {article.author ?? '佚名'} · {article.wordCount} 词 · 状态：

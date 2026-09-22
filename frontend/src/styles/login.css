@@ -5,8 +5,8 @@
    由 LoginPage.tsx 和 RequireAuth.tsx import，晚于 index.css 加载。 */
 
 .wrap.login-wrap {
-  max-width: 380px;
-  padding-top: 72px;
+  max-width: 420px;
+  padding-top: 48px;
   padding-bottom: 48px;
 }
 
@@ -19,12 +19,22 @@
   margin: 0;
 }
 
+.login-card {
+  margin-top: 28px;
+  padding: 32px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+
 .import-form.login-form {
   max-width: none;
-  margin-top: 22px;
+  margin-top: 0;
 }
 
 .login-submit {
+  width: 100%;
+  height: var(--field-h);
   margin-top: 4px;
 }
 .login-submit:disabled {
@@ -46,7 +56,7 @@
   padding: 0;
   line-height: 0;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--r-md);
   background: var(--surface);
   overflow: hidden;
   flex: none;

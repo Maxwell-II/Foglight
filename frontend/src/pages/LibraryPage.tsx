@@ -96,6 +96,12 @@ export default function LibraryPage() {
 
   return (
     <div className="wrap">
+      <div className="site-header">
+        <span className="brand">
+          Foglight <span className="brand__sub">雾灯</span>
+        </span>
+      </div>
+
       <div className="library-header">
         <h1 className="title">文章库</h1>
         <div className="library-header__actions">

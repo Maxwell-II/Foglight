@@ -287,6 +287,13 @@ export default function ReaderPage() {
     [session, articleDto, bookRunId, finishing, navigate, showToast, flushWrites],
   )
 
+  // 粉笔延伸中，状态条要报「起点是哪个词」——只在这一状态下算，其余时候是 null
+  const anchorText = useMemo(() => {
+    if (marking.state.kind !== 'extending' || !article) return null
+    const { p, w } = marking.state.anchor
+    return article.paragraphs[p]?.[w] ?? null
+  }, [marking.state, article])
+
   // F 快捷键完成阅读（architecture.md §6：1 黄笔 / 2 粉笔 / Esc 取消 / F 完成阅读）
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -319,7 +326,9 @@ export default function ReaderPage() {
         pen={marking.pen}
         state={marking.state}
         counts={counts}
+        anchorText={anchorText}
         onSetPen={marking.setPen}
+        onCancel={marking.cancel}
         onFinish={finish}
         finishLabel={articleDto.bookContext ? '结束本次阅读' : '完成阅读'}
       />
@@ -328,7 +337,7 @@ export default function ReaderPage() {
         <Link className="back-link" to={articleDto.bookContext ? `/books/${articleDto.bookContext.bookId}` : '/'}>
           ← {articleDto.bookContext ? '返回目录' : '返回文章库'}
         </Link>
-        <h1 className="title">{article.title}</h1>
+        <h1 className="article-title">{article.title}</h1>
         <div className="meta">
           {articleDto.bookContext && `${articleDto.bookContext.sectionTitle} · 第 ${articleDto.bookContext.pageNumber}/${articleDto.bookContext.pageCount} 页 · `}
           {article.author || '佚名'} · {article.wordCount} 词 · 约 {article.estMinutes} 分钟
