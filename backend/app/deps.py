@@ -2,8 +2,8 @@
 
 ★ 这个文件是接入登录的唯一改动点，Wave 3 §1.12 已核实这句话仍然成立：
   articles.py / sessions.py / marks.py 的每一个路由都通过 CurrentUser 拿用户，
-  没有任何一处直接读 settings.single_user_id —— 所以下面这个函数从
-  "返回固定用户"换成"读 cookie 查会话表"之后，业务路由一行都不用改。
+  没有任何一处写死用户 id —— 所以下面这个函数从"返回固定用户"换成
+  "读 cookie 查会话表"之后，业务路由一行都不用改。
 
   （这是选 FastAPI 而不是 Next.js 的直接回报之一，见 docs/architecture.md §2.3）
 
@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
@@ -152,3 +153,57 @@ def get_current_user(request: Request, db: DbSession) -> User:
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+# —— 导入权限（public-release.md §3⑥ + §2「公开版不做用户导入」）——
+
+IMPORT_FORBIDDEN_DETAIL = "没有导入权限"
+
+
+def get_import_user(user: CurrentUser) -> User:
+    """导入 / 预览三条路由的门：登录之外还要 can_import。
+
+    为什么不是"登录就能导入"：§2 拍板公开版不给用户导入入口，而这三条是全项目
+    最贵的入口（分词整篇正文、解析整本 epub）。只靠前端不给按钮等于没挡 ——
+    接口一直在，任何注册用户都能直接打。can_import 默认 false，迁移只给 id=1 开。
+    """
+    if not user.can_import:
+        raise HTTPException(status_code=403, detail=IMPORT_FORBIDDEN_DETAIL)
+    return user
+
+
+ImportUser = Annotated[User, Depends(get_import_user)]
+
+
+# —— 客户端 IP（登录 / 注册限流用）——
+
+
+def client_ip(request: Request) -> str:
+    """限流用的客户端标识。
+
+    优先取 nginx 设的 `X-Real-IP`（deploy/nginx.conf 里是 `$remote_addr`，
+    nginx 会**覆盖**客户端自带的同名头）。信它是安全的，前提是后端端口
+    只绑在 127.0.0.1（deploy/docker-compose.yml 的 `127.0.0.1:8001:8000`）——
+    公网绕不过 nginx，就伪造不了这个头。本地开发直连 uvicorn 时它可以被伪造，
+    那无所谓。
+
+    没有这个头（测试 / 本地直连）就退回 `request.client.host`。
+
+    IPv6 按 /64 归并：一个家庭宽带通常直接分到一整段 /64，逐地址计数的话
+    攻击者每次换一个地址就能让「单 IP 上限」形同虚设。
+    """
+    raw = (request.headers.get("x-real-ip") or "").strip()
+    if not raw and request.client is not None:
+        raw = request.client.host
+    if not raw:
+        return "unknown"
+    try:
+        ip = ipaddress.ip_address(raw)
+    except ValueError:
+        # TestClient 的 host 是 "testclient"，不是合法 IP；原样用作键即可
+        return raw
+    if isinstance(ip, ipaddress.IPv6Address):
+        if ip.ipv4_mapped is not None:
+            return str(ip.ipv4_mapped)
+        return str(ipaddress.ip_network(f"{ip}/64", strict=False))
+    return str(ip)

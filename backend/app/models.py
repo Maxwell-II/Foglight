@@ -85,7 +85,22 @@ class User(Base):
     email: Mapped[str | None] = mapped_column(String(320), unique=True, nullable=True)
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
-    # —— 登录限流（Wave 3 §A1）。按账号锁，不按 IP：单用户应用按 IP 只会在换网络时误伤自己 ——
+    # —— Google 一键登录（public-release.md §3b）——
+    # Google 的稳定用户 id（id_token 的 sub）。不拿 email 当 Google 身份的主键：
+    # 用户可以改 Google 账号的邮箱，sub 不会变。
+    google_sub: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
+
+    # —— 导入权限（public-release.md §3⑥）——
+    # 默认 false：公开版不给用户导入（§2 已拍板）。迁移只给 id=1 打开。
+    can_import: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("0"), nullable=False
+    )
+
+    # —— 已停用的两列（2026-09-24）——
+    # Wave 3 按账号锁定用的就是它们。多用户下「按账号锁」反转成漏洞：任何人对着
+    # 别人的邮箱连错 8 次就能把他锁 15 分钟，可无限续（public-release.md §3④）。
+    # 现在失败计数按 (email, IP) 放在进程内存里（app/services/ratelimit.py），
+    # 这两列不再被读写。留着不删：SQLite 删列要整表重建，为两个死字段不值得。
     failed_login_count: Mapped[int] = mapped_column(Integer, default=0)
     locked_until: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

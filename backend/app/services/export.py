@@ -1,7 +1,8 @@
 """导出服务：把文章 + 标记渲染成 Markdown，丢给 agent 讨论用。
 
-当前页面通过后端导出；frontend/src/lib/export.ts 保留旧前端实现。
-两份复盘指令保持一致，文章与书级导出共用这里的指令。
+导出只有这一份实现：登录用户、游客（POST /api/public/export）、书级导出都走这里，
+复盘指令也只在这里。旧的 frontend/src/lib/export.ts 已删除（user-flows.md §6），
+tests/test_export.py 钉着前端不许再出现第二份。
 """
 
 from __future__ import annotations
@@ -96,6 +97,23 @@ def build_markdown(
     lines.append(_CLOSING_INSTRUCTION)
 
     return "\n".join(lines)
+
+
+def build_article_markdown(article, marks: Sequence[MarkView]) -> str:
+    """单篇文章的导出：登录用户（GET /sessions/{id}/export）和游客
+    （POST /public/export）共用这一个入口。
+
+    「来源」行的回落顺序（source_name → source_url → 空）只能写在这一处 ——
+    两边各拼一次参数的话，游客拿到的复盘素材迟早和登录用户的不一样，
+    而这份 Markdown 就是这个产品的交付物（user-flows.md §6）。
+    """
+    return build_markdown(
+        title=article.title,
+        author=article.author,
+        source=article.source_name or article.source_url or "",
+        paragraphs=article.body_paragraphs,
+        marks=marks,
+    )
 
 
 # ---------- 书级导出（Wave 3 B2）----------

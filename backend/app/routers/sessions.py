@@ -11,7 +11,7 @@ from app.deps import CurrentUser, DbSession
 from app.models import Article, ReadingSession, SessionStatus
 from app.routers.articles import _get_visible_article
 from app.schemas import SessionCreate, SessionDetail, SessionOut, SessionUpdate
-from app.services.export import build_markdown
+from app.services.export import build_article_markdown
 
 router = APIRouter(tags=["sessions"])
 
@@ -68,11 +68,5 @@ def export_session(session_id: int, db: DbSession, user: CurrentUser) -> Respons
     if article is None:
         raise HTTPException(status_code=404, detail="文章不存在")
 
-    markdown = build_markdown(
-        title=article.title,
-        author=article.author,
-        source=article.source_name or article.source_url or "",
-        paragraphs=article.body_paragraphs,
-        marks=session.marks,
-    )
+    markdown = build_article_markdown(article, session.marks)
     return Response(content=markdown, media_type="text/markdown; charset=utf-8")

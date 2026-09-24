@@ -19,6 +19,11 @@ from app.models import License, MarkType, SessionStatus
 # 篇幅档位的输入形状：段落间怎么切，唯一实现见 app.services.normalize
 ParagraphMode = Literal["blank_line", "single_line"]
 
+# 粘贴导入 / 预览的正文上限（字符数）。20 万字符约 3.5 万英文词，比库里最长的
+# 单章还长一个量级；再长就不是「一篇文章」了。没有上限时，preview 这条路由
+# 可以被拿来烧 CPU（public-release.md §3⑥）：normalize + tokenize 是逐字符的纯 Python。
+MAX_IMPORT_TEXT_CHARS = 200_000
+
 
 class ApiModel(BaseModel):
     """所有对外模型的基类：输出 camelCase，输入两种写法都收。"""
@@ -86,7 +91,7 @@ class ArticleImportText(ApiModel):
     title: str
     author: str | None = None
     source_name: str | None = None
-    text: str
+    text: str = Field(max_length=MAX_IMPORT_TEXT_CHARS)
     license: License = "copyrighted"
     redistributable: bool = False
     topics: list[str] = Field(default_factory=list)
@@ -100,7 +105,7 @@ class ArticlePreviewRequest(ApiModel):
     title: str | None = None
     author: str | None = None
     source_name: str | None = None
-    text: str
+    text: str = Field(max_length=MAX_IMPORT_TEXT_CHARS)
     license: License = "copyrighted"
     redistributable: bool = False
     topics: list[str] = Field(default_factory=list)
@@ -133,6 +138,43 @@ class MarkCreate(ApiModel):
 class MarkOut(MarkCreate):
     id: int
     created_at: datetime
+
+
+# ---------- 游客导出 / 标记迁移（公开发布这一轮）----------
+#
+# 两处的上限是同一组数：游客一篇文章上标 500 处已经远超真实用法（库里最多的一次
+# 会话是几十条），再多就是有人拿接口当算力用。
+
+
+MAX_MARKS_PER_SESSION = 500
+MAX_IMPORT_SESSIONS = 50
+
+
+class PublicExportRequest(ApiModel):
+    """游客导出：文章 id + 他在 localStorage 里的标记。服务端不存任何东西。"""
+
+    article_id: int
+    marks: list[MarkCreate] = Field(default_factory=list, max_length=MAX_MARKS_PER_SESSION)
+
+
+class MarksImportSession(ApiModel):
+    article_id: int
+    finished: bool = False
+    marks: list[MarkCreate] = Field(default_factory=list, max_length=MAX_MARKS_PER_SESSION)
+
+
+class MarksImportRequest(ApiModel):
+    """游客注册后把本地标记搬进账号（user-flows.md 路径 2）。"""
+
+    sessions: list[MarksImportSession] = Field(max_length=MAX_IMPORT_SESSIONS)
+
+
+class MarksImportResult(ApiModel):
+    imported_sessions: int
+    imported_marks: int
+    #: 当前用户看不到的文章（不存在 / 下架 / 不在公开库），这些项被跳过、没写任何东西。
+    #: 去重、升序。前端据此决定本地哪些记录可以清、哪些要留着或丢弃
+    skipped_article_ids: list[int] = Field(default_factory=list)
 
 
 # ---------- ReadingSession ----------

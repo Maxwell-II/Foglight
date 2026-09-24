@@ -11,7 +11,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, or_
 
-from app.deps import CurrentUser, DbSession
+from app.deps import CurrentUser, DbSession, ImportUser
 from app.visibility import article_visible_to, visible_articles, visible_books
 from app.models import (
     Article,
@@ -38,6 +38,31 @@ from app.services.normalize import normalize
 from app.services.tokenize import tokenize
 
 router = APIRouter(tags=["articles"])
+
+# epub 上传上限。容器 mem_limit 是 256m、整机可用 698Mi（public-release.md §3⑥），
+# 而 parse_epub 要把整本书解压进内存再切分 —— 真实的 epub 很少超过 10MB，
+# 20MB 给插图多的书留了余量。
+MAX_EPUB_BYTES = 20 * 1024 * 1024
+_EPUB_READ_CHUNK = 1024 * 1024
+
+
+async def _read_epub_limited(file: UploadFile) -> bytes:
+    """分块读上传文件，累计超过上限立刻 413。
+
+    ⚠️ 不能先 `await file.read()` 再看长度：那一步就已经把整个文件放进内存了，
+       判断来得太晚。这里每次只多读 1MB，超限时内存里最多多出一个块。
+
+    （multipart 的解析发生在进这个函数之前，由 Starlette 把文件 spool 到临时文件 ——
+    超过 1MB 的部分落在磁盘上，不占内存。外层的请求体上限在 nginx 那一层。）
+    """
+    if file.size is not None and file.size > MAX_EPUB_BYTES:
+        raise HTTPException(status_code=413, detail="epub 文件超过 20MB 上限")
+    buffer = bytearray()
+    while chunk := await file.read(_EPUB_READ_CHUNK):
+        buffer.extend(chunk)
+        if len(buffer) > MAX_EPUB_BYTES:
+            raise HTTPException(status_code=413, detail="epub 文件超过 20MB 上限")
+    return bytes(buffer)
 
 
 def _est_minutes(word_count: int) -> int:
@@ -164,8 +189,13 @@ def get_article(article_id: int, db: DbSession, user: CurrentUser) -> Article:
 
 
 @router.post("/articles/preview/text", response_model=ArticlePreviewResponse)
-def preview_text(payload: ArticlePreviewRequest) -> ArticlePreviewResponse:
-    """粘贴导入前的预览：分段、计数、篇幅档位。不入库、不写数据库。"""
+def preview_text(payload: ArticlePreviewRequest, _user: ImportUser) -> ArticlePreviewResponse:
+    """粘贴导入前的预览：分段、计数、篇幅档位。不入库、不写数据库。
+
+    曾经是全项目唯一一条不要登录的业务路由（public-release.md §3⑥）。不写库不等于
+    无害：分词是纯 Python 逐字符处理，谁都能打就是谁都能烧 CPU。现在和两条导入
+    路由一样要求 can_import。
+    """
     body_paragraphs = tokenize(normalize(payload.text, paragraph_mode=payload.paragraph_mode))
     word_count = sum(len(p) for p in body_paragraphs)
     # 借用 Article.level 这一个唯一实现（§1.7），不额外造一份阈值判断——
@@ -180,7 +210,7 @@ def preview_text(payload: ArticlePreviewRequest) -> ArticlePreviewResponse:
 
 
 @router.post("/articles/import/text", response_model=ArticleDetail, status_code=201)
-def import_text(payload: ArticleImportText, db: DbSession, user: CurrentUser) -> Article:
+def import_text(payload: ArticleImportText, db: DbSession, user: ImportUser) -> Article:
     body_paragraphs = tokenize(normalize(payload.text, paragraph_mode=payload.paragraph_mode))
     word_count = sum(len(p) for p in body_paragraphs)
 
@@ -206,13 +236,13 @@ def import_text(payload: ArticleImportText, db: DbSession, user: CurrentUser) ->
 @router.post("/articles/import/epub")
 async def import_epub(
     db: DbSession,
-    user: CurrentUser,
+    user: ImportUser,
     file: Annotated[UploadFile, File()],
     titles: Annotated[list[str], Form()] = [],  # noqa: B006 - FastAPI Form 需要可变默认值来识别重复字段
     book_title: Annotated[str | None, Form(alias="bookTitle")] = None,
 ):
     """两段式：不传 titles 只探测候选片段，传了才真正入库（入库即建书，Wave 3 B3）。"""
-    data = await file.read()
+    data = await _read_epub_limited(file)
     segments = parse_epub(data)
 
     # —— 第一段：只探测，不入库。⚠️ 这一段的行为一个字都不许变 ——

@@ -19,10 +19,6 @@ class Settings(BaseSettings):
     database_url: str = f"sqlite:///{_DEFAULT_DB}"
     book_assets_dir: Path = _DEFAULT_BOOK_ASSETS
 
-    # Phase 1 是单用户，没有登录。这个 id 由 deps.get_current_user() 使用。
-    # Phase 3 接入真实认证后此项作废，见 deps.py 的说明。
-    single_user_id: int = 1
-
     # 允许跨域的前端地址（开发时 Vite 跑在 5173）
     cors_origins: list[str] = ["http://localhost:5173"]
 
@@ -32,6 +28,23 @@ class Settings(BaseSettings):
     #    线上由 deploy/docker-compose.yml 注入 SESSION_COOKIE_SECURE=true。
     session_cookie_secure: bool = False
     session_ttl_days: int = 30
+
+    # —— Google 一键登录（public-release.md §3b）——
+    # 两个都配了才算开启（/auth/providers 返回 google=true）。只配一个等于没配：
+    # 缺 secret 换不了 token，缺 id 连跳转都拼不出来 —— 与其半开着让人点进去
+    # 转一圈再失败，不如直接不显示按钮。
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    # 回调地址。留空时由请求推出：X-Forwarded-Proto（nginx 设成 $scheme）+ Host
+    # （nginx 原样转发 $host），线上推出来就是
+    # https://read.rnuxay.xyz/api/auth/google/callback。
+    # 显式配上更稳：它必须和 Google Console 里登记的**逐字节**一致，
+    # 推导值一旦因为反代配置变动差一个字符，Google 就报 redirect_uri_mismatch。
+    google_redirect_uri: str = ""
+
+    @property
+    def google_enabled(self) -> bool:
+        return bool(self.google_client_id and self.google_client_secret)
 
 
 settings = Settings()

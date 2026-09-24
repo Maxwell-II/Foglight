@@ -51,6 +51,11 @@ from app.services.password import hash_password  # noqa: E402
 
 MIN_PASSWORD_LEN = 8
 
+# The owner's account. Deliberately a local constant, not a setting: since
+# registration opened the app itself has no notion of a "default user" any more
+# (the old config setting for it was removed); only this maintenance script does.
+OWNER_USER_ID = 1
+
 
 def _ascii(text: str) -> str:
     return text.encode("ascii", errors="backslashreplace").decode("ascii")
@@ -133,10 +138,10 @@ def main(argv: list[str] | None = None) -> int:
     session = SessionLocal()
     try:
         clash = session.query(User).filter(User.email == email).one_or_none()
-        target = None if args.new else session.get(User, settings.single_user_id)
+        target = None if args.new else session.get(User, OWNER_USER_ID)
 
         if not args.new and target is None:
-            print(f"user_id={settings.single_user_id} does not exist in this database.")
+            print(f"user_id={OWNER_USER_ID} does not exist in this database.")
             print("nothing to upgrade. if you really want a fresh account, pass --new.")
             return 1
 
@@ -160,7 +165,10 @@ def main(argv: list[str] | None = None) -> int:
 
         target.email = email
         target.password_hash = hash_password(password)
-        # Setting a password is also the recovery path out of a lockout.
+        # Legacy columns: login lockout moved to in-process memory keyed by
+        # (email, IP) on 2026-09-24 and no longer reads these. Resetting them is
+        # harmless; the recovery path out of a lockout is now waiting 15 minutes
+        # or restarting the api container.
         target.failed_login_count = 0
         target.locked_until = None
         session.commit()

@@ -33,7 +33,7 @@ def health() -> dict[str, str]:
 
 
 # —— 路由挂载 ——
-from app.routers import articles, auth, books, marks, sessions  # noqa: E402
+from app.routers import articles, auth, books, marks, public, sessions  # noqa: E402
 
 app.include_router(articles.router, prefix="/api")
 app.include_router(sessions.router, prefix="/api")
@@ -42,3 +42,5 @@ app.include_router(marks.router, prefix="/api")
 # 这样 main.py 就不再是两条线的共享文件 —— 谁都不用改它。
 app.include_router(books.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
+# 游客接口（不需要登录）。单独一个 router，公开面一眼看得全
+app.include_router(public.router, prefix="/api")
