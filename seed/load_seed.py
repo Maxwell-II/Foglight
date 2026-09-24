@@ -293,7 +293,9 @@ def _import_text_entry(
             title=title,
             author=meta.get("author", entry.get("author", "")) or None,
             source_type=SourceType.CURATED,
-            source_url=None,
+            # 公开库的文本要能链回原文（署名 / 出处），所以允许 front matter 带 source_url；
+            # 粘贴来的私人文本没有原文地址，照旧留空。
+            source_url=meta.get("source_url") or None,
             source_name=source_name,
             license=meta.get("license", entry.get("license", License.COPYRIGHTED)),
             redistributable=_parse_bool(
