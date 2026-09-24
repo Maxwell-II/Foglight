@@ -6,6 +6,7 @@ import { useCurrentParagraph } from '../hooks/useCurrentParagraph'
 import { useReadingStore, type ReadingMode } from '../hooks/useReadingStore'
 import { ArticleBody } from '../components/reader/ArticleBody'
 import { PenToolbar } from '../components/reader/PenToolbar'
+import SourceCredit from '../components/SourceCredit'
 import { guestStorageAvailable } from '../lib/guestStorage'
 import type { LoadedReading } from '../lib/readingStore'
 import { marksAt } from '../lib/pos'
@@ -344,6 +345,7 @@ export default function ReaderPage({ mode }: { mode: ReadingMode }) {
         <div className="meta">
           {bookContext && `${bookContext.sectionTitle} · 第 ${bookContext.pageNumber}/${bookContext.pageCount} 页 · `}
           {article.author || '佚名'} · {article.wordCount} 词 · 约 {article.estMinutes} 分钟
+          <SourceCredit url={article.sourceUrl} name={article.source} />
           {/* 不是提示条，只是 meta 行尾一句：说实话，但不抢正文 */}
           {store.kind === 'guest' && ' · 未登录，标记只存在这台浏览器里'}
         </div>

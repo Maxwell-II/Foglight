@@ -7,20 +7,8 @@
  */
 
 import { Link } from 'react-router-dom'
-import { SUPPORT_CONTACT } from '../lib/site'
+import SupportContact from '../components/SupportContact'
 import '../styles/login.css'
-
-function Contact() {
-  if (!SUPPORT_CONTACT) return <strong>联系方式即将公布。</strong>
-  if (SUPPORT_CONTACT.includes('@')) {
-    return (
-      <a href={`mailto:${SUPPORT_CONTACT}?subject=${encodeURIComponent('Foglight 重置密码')}`}>
-        {SUPPORT_CONTACT}
-      </a>
-    )
-  }
-  return <strong>{SUPPORT_CONTACT}</strong>
-}
 
 export default function ForgotPage() {
   return (
@@ -36,7 +24,7 @@ export default function ForgotPage() {
       <div className="login-card forgot-card">
         <p>现在还没有自助重置密码，需要人工帮你重置。自助重置正在做。</p>
         <p>
-          联系：<Contact />
+          联系：<SupportContact subject="Foglight 重置密码" />
           <br />
           <span className="dim">请用注册时的邮箱联系，说明要重置哪个账号。</span>
         </p>

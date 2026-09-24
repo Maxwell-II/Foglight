@@ -5,6 +5,7 @@ import { useReadingStore, type ReadingMode } from '../hooks/useReadingStore'
 import type { LoadedReading } from '../lib/readingStore'
 import { cmp } from '../lib/pos'
 import BookNextChapter from '../components/BookNextChapter'
+import SourceCredit from '../components/SourceCredit'
 
 /** 下载用的文件名。标题里可能有 / : ? 之类在各系统上不合法的字符，换掉 */
 function fileNameFor(title: string): string {
@@ -108,6 +109,7 @@ export default function ReviewPage({ mode }: { mode: ReadingMode }) {
       <div className="meta">
         {article.author ?? '佚名'} · {article.wordCount} 词 · 状态：
         {status === 'finished' ? '已完成' : status === 'abandoned' ? '已放弃' : '阅读中'}
+        <SourceCredit url={article.sourceUrl} name={article.sourceName} />
       </div>
 
       <Link className="btn-primary" to={store.readerPath}>

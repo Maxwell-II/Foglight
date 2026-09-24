@@ -13,6 +13,7 @@ import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import ForgotPage from './pages/ForgotPage'
+import PrivacyPage from './pages/PrivacyPage'
 import BookReviewPage from './pages/BookReviewPage'
 
 function NotFound() {
@@ -86,6 +87,15 @@ export default function App() {
             <>
               <AppActions />
               <ForgotPage />
+            </>
+          }
+        />
+        <Route
+          path="/privacy"
+          element={
+            <>
+              <AppActions />
+              <PrivacyPage />
             </>
           }
         />

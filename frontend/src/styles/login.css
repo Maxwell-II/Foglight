@@ -191,6 +191,13 @@
 .forgot-card p { margin: 0 0 12px; font-size: 14px; line-height: 1.8; }
 .forgot-card p:last-child { margin-bottom: 0; }
 
+/* 隐私说明：比登录卡宽一点，分节有小标题 */
+.wrap.login-wrap.privacy-wrap { max-width: 640px; }
+.privacy-card h2 { margin: 24px 0 8px; font-size: 15px; font-weight: 500; }
+.privacy-card h2:first-child { margin-top: 0; }
+.privacy-card ul { margin: 0 0 12px; padding-left: 20px; font-size: 14px; line-height: 1.8; }
+.privacy-card li + li { margin-top: 4px; }
+
 @media (max-width: 640px) {
   .login-card { padding: 22px 18px; }
   .register-wrap .auth-split { grid-template-columns: minmax(0, 1fr); gap: 0; }

@@ -26,6 +26,8 @@ export interface Article {
   title: string
   author: string
   source: string
+  /** 原文地址，给 meta 行的出处链接用；粘贴导入、书页没有 */
+  sourceUrl: string | null
   wordCount: number
   estMinutes: number
   /**

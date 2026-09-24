@@ -48,6 +48,11 @@ export default function PublicLayout({
     <div className="public">
       <PublicHeader actions={actions} />
       <main className="public-main">{children}</main>
+      <footer className="public-footer">
+        <Link to="/privacy">隐私说明</Link>
+        <span aria-hidden="true"> · </span>
+        <span>文章来自公有领域和开放授权的作品，每篇都注明出处</span>
+      </footer>
     </div>
   )
 }

@@ -1183,6 +1183,15 @@ button { font-family: inherit; cursor: pointer; }
   padding: 16px 32px 96px;
 }
 
+.public-footer {
+  max-width: 1104px;
+  margin: 0 auto;
+  padding: 0 32px 40px;
+  font-size: 12px;
+  color: var(--dim);
+}
+.public-footer a { color: inherit; }
+
 /* 公开页面和登录注册里的行内链接。全站没有 a 的基础样式，暗色下会落回浏览器默认的
    蓝紫色 —— 在雾色界面里很扎眼。只收这几处新页面，不动已有页面的链接。 */
 .public a:not([class]),
@@ -1383,6 +1392,7 @@ button { font-family: inherit; cursor: pointer; }
   .public-header__actions .btn-primary,
   .public-header__actions .btn-secondary { height: 34px; padding: 0 12px; font-size: 13px; }
   .public-main { padding: 8px 16px 72px; }
+  .public-footer { padding: 0 16px 32px; }
 
   .featured { padding: 24px 20px; }
   .featured--loading { min-height: 320px; }

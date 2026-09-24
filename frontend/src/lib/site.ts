@@ -16,4 +16,4 @@ export const FEATURED_TITLE = 'The Only Way to Respond to Life'
  * 空字符串 = 还没定：/forgot 显示「联系方式即将公布」，不留一个点了没反应的死链接。
  * 填邮箱会渲染成 mailto 链接，填别的（微信号之类）原样显示。
  */
-export const SUPPORT_CONTACT: string = ''
+export const SUPPORT_CONTACT: string = 'support@rnuxay.xyz'

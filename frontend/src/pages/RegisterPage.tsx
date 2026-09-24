@@ -129,6 +129,8 @@ export default function RegisterPage() {
 
       <p className="auth-footnote">
         已经有账号？<Link to="/login">登录</Link>
+        <span aria-hidden="true"> · </span>
+        <Link to="/privacy">注册前可以先看隐私说明：存什么、存多久</Link>
       </p>
     </div>
   )

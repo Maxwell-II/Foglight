@@ -511,6 +511,7 @@ export function toArticle(dto: ArticleDetailDto): Article {
     title: dto.title,
     author: dto.author ?? '',
     source: dto.sourceName ?? dto.sourceUrl ?? dto.sourceType,
+    sourceUrl: dto.sourceUrl,
     wordCount: dto.wordCount,
     estMinutes: dto.estMinutes,
     // ⚠️ 已经是后端分好词的结果，直接用，不能再 split 一次
