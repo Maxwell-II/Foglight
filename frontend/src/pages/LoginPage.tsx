@@ -7,10 +7,18 @@
  */
 
 import { useEffect, useState, type FormEvent } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { ApiError, getCaptcha, login, type CaptchaDto, type LoginResult } from '../api/client'
+import { GoogleButton, useGoogleAvailable } from '../components/GoogleSignIn'
 import { formatCountdown } from '../lib/auth'
+import { resetGuestImportDismissal } from '../lib/guestStorage'
 import '../styles/login.css'
+
+/** Google 回调失败时后端把人送回 /login?error=…。只认这两个值，别的原样忽略 */
+const GOOGLE_ERRORS: Record<string, string> = {
+  google: 'Google 登录没有完成。可以再试一次，或者用邮箱登录。',
+  google_unavailable: 'Google 登录暂时用不了，请先用邮箱登录。',
+}
 
 interface LoginNavState {
   from?: string
@@ -31,7 +39,10 @@ function failureMessage(result: LoginResult): string {
 export default function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const from = (location.state as LoginNavState | null)?.from ?? '/'
+  const from = (location.state as LoginNavState | null)?.from ?? '/library'
+  const [searchParams] = useSearchParams()
+  const googleError = GOOGLE_ERRORS[searchParams.get('error') ?? ''] ?? null
+  const googleAvailable = useGoogleAvailable()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -78,6 +89,8 @@ export default function LoginPage() {
       })
 
       if (result.ok) {
+        // 同一个标签页里退出再登录也算「下次登录」：上次点过「暂不」的本地标记要再问一次
+        resetGuestImportDismissal()
         navigate(from, { replace: true })
         return
       }
@@ -89,9 +102,13 @@ export default function LoginPage() {
       // 不换的话下一次提交必定再失败一次，看上去像"密码明明是对的"。
       if (result.needsCaptcha) await refreshCaptcha()
     } catch (err) {
+      // 429 是按 IP 的全局上限（跨账号累计失败），和单账号的锁定是两回事 ——
+      // 它不走 LoginOut，没有 lockedForSeconds 可显示。
       setError(
         err instanceof ApiError
-          ? `登录请求失败（${err.status}）。`
+          ? err.status === 429
+            ? '尝试过于频繁，稍后再试。'
+            : `登录请求失败（${err.status}）。`
           : '连不上服务器，稍后再试。',
       )
     } finally {
@@ -106,15 +123,25 @@ export default function LoginPage() {
       <div className="brand">Foglight</div>
 
       <h1 className="title login-title" style={{ marginTop: 32 }}>登录</h1>
-      <p className="dim login-sub">这是私人阅读器，账号由命令行建，不开放注册。</p>
+      <p className="dim login-sub">登录后，阅读记录存在账号里，换设备也在。</p>
 
-      {error && (
+      {/* 表单自己的错误优先：提交过一次之后，地址栏里那个 Google 错误已经是旧闻了 */}
+      {(error ?? googleError) && (
         <div className="error-banner" role="alert">
-          {error}
+          {error ?? googleError}
         </div>
       )}
 
       <div className="login-card">
+        {googleAvailable && (
+          <>
+            <GoogleButton />
+            <div className="auth-or" aria-hidden="true">
+              或者用邮箱
+            </div>
+          </>
+        )}
+
         <form className="import-form login-form" onSubmit={onSubmit}>
           <label className="field">
             邮箱
@@ -172,7 +199,18 @@ export default function LoginPage() {
             {locked ? `已锁定 ${formatCountdown(lockedFor)}` : submitting ? '登录中…' : '登录'}
           </button>
         </form>
+
+        <div className="auth-links">
+          <Link to="/forgot">忘记密码</Link>
+          <span>
+            没有账号？<Link to="/register">注册</Link>
+          </span>
+        </div>
       </div>
+
+      <p className="auth-footnote">
+        不登录也能读：<Link to="/">回首页挑一篇</Link>
+      </p>
     </div>
   )
 }

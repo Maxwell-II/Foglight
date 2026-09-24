@@ -28,7 +28,7 @@ import {
   type BookSummaryDto,
 } from '../api/client'
 import { LOGIN_PATH, signOut } from '../lib/auth'
-import { useAuthUser } from './RequireAuth'
+import { useAuthUser, useDataVersion } from './RequireAuth'
 import ThemeToggle from './ThemeToggle'
 
 interface ShellData {
@@ -219,7 +219,7 @@ function Sidebar({
   return (
     <nav className="sidebar" aria-label="主导航">
       <div className="sidebar__top">
-        <Link className="sidebar__brand" to="/" title="Foglight">
+        <Link className="sidebar__brand" to="/library" title="Foglight">
           <span className="lamp" aria-hidden="true" />
           <span className="sidebar__brand-name">Foglight</span>
         </Link>
@@ -239,8 +239,13 @@ function Sidebar({
       {resume && !collapsed && <ResumeCard resume={resume} />}
 
       <div className="sidebar__nav">
-        <NavRow to="/" end icon={<ArticleIcon />} label="文章" count={articles?.length ?? null} />
-        <NavRow to={booksTo} icon={<BookIcon />} label="书" count={books?.length ?? null} />
+        <NavRow to="/library" end icon={<ArticleIcon />} label="文章" count={articles?.length ?? null} />
+        {/* 没有书就整项不出现。书是有版权的、永远不进公开库，公开版又不做用户导入，
+            新账号的书架永远是空的 —— 给一个永远填不满的入口不如不给（design-brief §7⑤）。
+            加载中也先不画：否则新用户每次进来都会看到它闪一下再消失。 */}
+        {books && books.length > 0 && (
+          <NavRow to={booksTo} icon={<BookIcon />} label="书" count={books.length} />
+        )}
         {/* 稿子里这里还有第三个平级区「复盘记录」。后端没有列出历史会话的接口
             （只有 GET /sessions/{id}），做不了 —— 补上 GET /sessions 之后再加，
             不先摆一个点进去是空页的入口。 */}
@@ -251,10 +256,13 @@ function Sidebar({
       {/* 导入和用户行是 .sidebar 的直接子元素，**不包在一个 footer 里**：
           窄屏要把它们拆到两个地方去（导入变成第三个 tab，用户行浮到右上角），
           包在一起的话就只能整块搬，两边必然有一个放错位置。 */}
-      <Link className="nav-row nav-row--ghost" to="/import" title="导入文章">
-        <ImportIcon />
-        <span className="nav-row__label">导入文章</span>
-      </Link>
+      {/* 公开版不给导入入口（public-release.md §2，2026-09-16），只有 canImport 的账号看得到 */}
+      {user?.canImport && (
+        <Link className="nav-row nav-row--ghost" to="/import" title="导入文章">
+          <ImportIcon />
+          <span className="nav-row__label">导入文章</span>
+        </Link>
+      )}
 
       <div className="sidebar__user">
         <span className="avatar" title={user?.email}>
@@ -280,6 +288,8 @@ export default function AppShell() {
   const [error, setError] = useState<string | null>(null)
   const [tick, setTick] = useState(0)
   const [collapsed, setCollapsed] = useState(readCollapsed)
+  // 守卫那层迁移了游客标记之后会 +1，这里跟着重拉，文章库的「读过 / 标了 N 处」才对得上
+  const dataVersion = useDataVersion()
 
   const reload = useCallback(() => setTick((n) => n + 1), [])
 
@@ -311,7 +321,7 @@ export default function AppShell() {
     return () => {
       cancelled = true
     }
-  }, [tick])
+  }, [tick, dataVersion])
 
   return (
     <ShellDataContext.Provider value={{ articles, books, error, reload }}>

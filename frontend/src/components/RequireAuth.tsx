@@ -1,15 +1,18 @@
 /**
- * 路由守卫（Wave 3 A2）。自包含：不改 App.tsx（那是书籍线的文件），
- * 由规划方在合并时把需要保护的路由包进来。
+ * 路由守卫（Wave 3 A2）。在 App.tsx 里作为无路径的 layout route 挂一层：
  *
- *   <RequireAuth><LibraryPage /></RequireAuth>
+ *   <Route element={<RequireAuth><Outlet /></RequireAuth>}> …要登录的页面… </Route>
+ *
+ * 公开页面（落地页、/try、登录注册）**不能**包进来 —— 它们要判断登录态时
+ * 自己调一次 probeAuth()。
  */
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { LOGIN_PATH, probeAuth, type AuthStatus } from '../lib/auth'
 import type { MeDto } from '../api/client'
 import AppActions from './AppActions'
+import GuestImportPrompt from './GuestImportPrompt'
 import '../styles/login.css'
 
 /**
@@ -24,10 +27,23 @@ export function useAuthUser(): MeDto | null {
   return useContext(AuthUserContext)
 }
 
+/**
+ * 账号里的阅读数据在守卫这一层被改过几次（目前只有游客标记迁移）。
+ * <AppShell> 把它放进拉列表的依赖里：迁移成功后文章库的「读过 / 标了 N 处」要跟着变。
+ * 迁移弹窗挂在守卫这层、壳的外面，所以不能直接调 useShellData().reload()。
+ */
+const DataVersionContext = createContext(0)
+
+export function useDataVersion(): number {
+  return useContext(DataVersionContext)
+}
+
 export default function RequireAuth({ children }: { children: ReactNode }) {
   const location = useLocation()
   const [status, setStatus] = useState<AuthStatus>('checking')
   const [user, setUser] = useState<MeDto | null>(null)
+  const [dataVersion, setDataVersion] = useState(0)
+  const bumpData = useCallback(() => setDataVersion((n) => n + 1), [])
 
   useEffect(() => {
     let cancelled = false
@@ -65,5 +81,13 @@ export default function RequireAuth({ children }: { children: ReactNode }) {
 
   // 主题和退出按钮不再挂在右上角：它们进了 <AppShell> 的侧栏页脚。
   // 'checking' 分支里那个 <AppActions> 留着 —— 那时候壳还没渲染。
-  return <AuthUserContext.Provider value={user}>{children}</AuthUserContext.Provider>
+  return (
+    <AuthUserContext.Provider value={user}>
+      <DataVersionContext.Provider value={dataVersion}>
+        {children}
+        {/* 进入已登录区域时问一次本地标记要不要带进账号。没有本地标记时它什么都不渲染 */}
+        <GuestImportPrompt onImported={bumpData} />
+      </DataVersionContext.Provider>
+    </AuthUserContext.Provider>
+  )
 }

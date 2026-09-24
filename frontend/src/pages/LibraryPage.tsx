@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ApiError, createSession, type ArticleLevel, type ArticleSummaryDto } from '../api/client'
 import { useShellData } from '../components/AppShell'
+import { useAuthUser } from '../components/RequireAuth'
 import { ListPanel, ListRow, MarkedRowState } from '../components/ListPanel'
 
 const LEVEL_STORAGE_KEY = 'reading.libraryLevel'
@@ -30,6 +31,8 @@ function readStoredLevel(): LevelFilter {
 export default function LibraryPage() {
   const navigate = useNavigate()
   const { articles, error: shellError } = useShellData()
+  // 导入入口只给 canImport 的账号。别的账号看到「去导入一篇」只会点进一个被弹回来的页面
+  const canImport = useAuthUser()?.canImport ?? false
   const [error, setError] = useState<string | null>(null)
   const [startingId, setStartingId] = useState<number | null>(null)
   const [level, setLevel] = useState<LevelFilter>(readStoredLevel)
@@ -107,16 +110,35 @@ export default function LibraryPage() {
 
       {articles === null && !shown && <p className="dim">加载中…</p>}
 
-      {articles && articles.length === 0 && <p className="dim">还没有文章，先去导入一篇。</p>}
-
-      {filtered && filtered.length === 0 && (
-        <p className="dim">
-          {level === 'short' ? (
-            <>
-              还没有短文，<Link to="/import">去导入一篇</Link>
-            </>
+      {/* 整个库都空：新账号在公开库上线前就会撞上这一屏（design-brief §7①），
+          所以要说清楚是「内容在准备」而不是「你做错了什么」 */}
+      {articles && articles.length === 0 && (
+        <div className="empty-state">
+          <span className="lamp" aria-hidden="true" />
+          <h2 className="empty-state__title">文章库还是空的</h2>
+          {canImport ? (
+            <p className="empty-state__body">
+              还没有任何文章。<Link to="/import">导入一篇</Link>就能开始读。
+            </p>
           ) : (
-            '这个档位还没有文章。'
+            <p className="empty-state__body">
+              第一批公开文章正在整理（都是可以合法公开的英文原文），上架后会出现在这里，不需要你做什么。
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* 库里有文章、只是这个档位没有 —— 短文本来就是少数（§7②），给一条去别的档位的路 */}
+      {articles && articles.length > 0 && filtered && filtered.length === 0 && (
+        <p className="dim">
+          {level === 'short' ? '这里还没有短文。' : '这个档位还没有文章。'}
+          <button className="link-button" type="button" onClick={() => selectLevel('all')}>
+            看全部 {articles.length} 篇
+          </button>
+          {canImport && level === 'short' && (
+            <>
+              ，或者<Link to="/import">导入一篇</Link>
+            </>
           )}
         </p>
       )}

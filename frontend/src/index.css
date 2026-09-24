@@ -1147,3 +1147,247 @@ button { font-family: inherit; cursor: pointer; }
   .logout-btn { padding: 0 10px; font-size: 12px; }
   .book-toc-row { flex-direction: column; gap: 4px; }
 }
+
+/* ---------- 公开页面：落地页 / 游客读完页（components/PublicLayout.tsx） ----------
+   不套 .app 壳：游客没有侧栏。版心和 .page 一样宽，顶栏只有品牌和登录注册。 */
+
+.public { min-height: 100vh; }
+
+.public-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  max-width: 1104px;
+  margin: 0 auto;
+  padding: 20px 32px;
+}
+.public-header__brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1;
+  color: var(--ink);
+  text-decoration: none;
+}
+.public-header__brand:hover { color: var(--ink); }
+.public-header__actions { display: flex; align-items: center; gap: 8px; }
+.public-header__actions .btn-primary,
+.public-header__actions .btn-secondary { height: 38px; padding: 0 16px; font-size: 14px; }
+
+.public-main {
+  max-width: 1104px;
+  margin: 0 auto;
+  padding: 16px 32px 96px;
+}
+
+/* 公开页面和登录注册里的行内链接。全站没有 a 的基础样式，暗色下会落回浏览器默认的
+   蓝紫色 —— 在雾色界面里很扎眼。只收这几处新页面，不动已有页面的链接。 */
+.public a:not([class]),
+.login-wrap a:not([class]),
+.empty-state a:not([class]) {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.public a:not([class]):hover,
+.login-wrap a:not([class]):hover,
+.empty-state a:not([class]):hover { color: var(--link-hover); }
+
+/* .btn-secondary 用 font: inherit，和 14px 的 .btn-primary 并排时会大一号 */
+.review-actions .btn-secondary,
+.guest-note__actions .btn-secondary,
+.modal__actions .btn-secondary { font-size: 14px; }
+
+.btn-primary.btn-lg { height: var(--control-h-lg); padding: 0 28px; font-size: 15px; }
+
+/* 行内的「按钮但长得像链接」—— 比如「看全部 N 篇」，它改的是本页状态，不是去别处 */
+.link-button {
+  border: none;
+  background: none;
+  padding: 0 0 0 6px;
+  font: inherit;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.link-button:hover { color: var(--link-hover); }
+
+/* ---- 落地页：第一屏就是那篇短文，tagline 只是它头顶一行 ---- */
+
+.landing-hero { display: flex; flex-direction: column; gap: var(--sp-3); }
+.landing-tagline {
+  margin: 0;
+  font-size: var(--title);
+  font-weight: 500;
+  color: var(--ink);
+}
+.landing-lede { margin: 0 0 var(--sp-4); font-size: 15px; line-height: 1.8; color: var(--ink-2); }
+
+.featured {
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-sm);
+  padding: 40px 48px;
+}
+.featured--loading { min-height: 420px; }
+.featured__label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--dim);
+  margin-bottom: var(--sp-4);
+}
+.featured__title {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: var(--display-page);
+  line-height: 1.15;
+  margin: 0 0 6px;
+  overflow-wrap: anywhere;
+}
+.featured--empty .featured__title {
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: var(--title);
+  margin-bottom: var(--sp-3);
+}
+.featured__meta { margin-bottom: var(--sp-5); }
+.featured__text { font-size: 15px; line-height: 1.8; margin: 0 0 var(--sp-3); max-width: 640px; }
+.featured__text:last-child { margin-bottom: 0; }
+
+/* 正文开头按阅读器的排法来：他在这里看到的字号行距，就是点进去之后的样子 */
+.featured__excerpt {
+  max-width: var(--read-measure);
+  font-family: var(--font-read);
+  font-size: var(--read-size);
+  line-height: var(--read-leading);
+  color: var(--ink);
+  overflow-wrap: break-word;
+  /* 末尾淡出：告诉他「后面还有」，比一个「展开」按钮少一个决定 */
+  -webkit-mask-image: linear-gradient(180deg, #000 70%, transparent);
+  mask-image: linear-gradient(180deg, #000 70%, transparent);
+}
+.featured__excerpt p { margin: 0 0 var(--read-para-gap); }
+.featured__excerpt--pending { min-height: 180px; }
+
+.featured__cta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-3) var(--sp-4);
+  margin-top: var(--sp-4);
+}
+.featured__cta-note { font-size: 13px; color: var(--dim); }
+
+.landing-section { margin-top: var(--sp-8); }
+.landing-section__title { font-size: 18px; font-weight: 500; margin: 0 0 var(--sp-4); }
+
+.promises { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-3); }
+.promises li {
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--ink-2);
+  padding: 14px 18px;
+  border-left: 3px solid var(--lamp);
+  background: var(--surface);
+  border-radius: 0 var(--r-md) var(--r-md) 0;
+}
+.promises strong { display: block; color: var(--ink); font-weight: 500; }
+
+.pen-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-4); }
+.pen-card {
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 18px 20px;
+}
+.pen-card__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  margin: 0 0 8px;
+}
+.pen-card p { margin: 0; font-size: 14px; line-height: 1.8; color: var(--ink-2); }
+.landing-note { margin: var(--sp-4) 0 0; font-size: 14px; line-height: 1.8; color: var(--dim); }
+
+/* ---------- 空状态（文章库还是 0 篇） ---------- */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: 40px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+}
+.empty-state__title { margin: 0; font-size: 18px; font-weight: 500; }
+.empty-state__body { margin: 0; font-size: 14px; line-height: 1.8; color: var(--ink-2); max-width: 560px; }
+
+/* ---------- 读完页：导出按钮行 + 游客提示 ---------- */
+
+.review-export-hint { margin: 0 0 12px; line-height: 1.8; }
+.review-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+
+.guest-note {
+  margin-top: var(--sp-6);
+  padding: 20px 24px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--lamp);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+.guest-note p { margin: 0 0 8px; font-size: 14px; line-height: 1.8; }
+.guest-note strong { font-weight: 500; }
+.guest-note__actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+
+/* ---------- 弹窗（本地标记迁移询问） ---------- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(15, 20, 26, 0.36);
+}
+.modal {
+  width: 100%;
+  max-width: 460px;
+  padding: 28px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-lg);
+}
+.modal__title { margin: 0 0 12px; font-size: 18px; font-weight: 500; line-height: 1.5; }
+.modal__body { margin: 0 0 16px; font-size: 14px; line-height: 1.8; color: var(--ink-2); }
+.modal__actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
+
+@media (max-width: 640px) {
+  .public-header { padding: 12px 16px; padding-top: max(12px, env(safe-area-inset-top)); }
+  .public-header__brand { font-size: 20px; gap: 10px; }
+  .public-header__actions { gap: 6px; }
+  .public-header__actions .btn-primary,
+  .public-header__actions .btn-secondary { height: 34px; padding: 0 12px; font-size: 13px; }
+  .public-main { padding: 8px 16px 72px; }
+
+  .featured { padding: 24px 20px; }
+  .featured--loading { min-height: 320px; }
+  .pen-cards { grid-template-columns: minmax(0, 1fr); }
+  .empty-state { padding: 24px 20px; }
+  .guest-note { padding: 16px 18px; }
+  .modal { padding: 22px 20px; }
+}

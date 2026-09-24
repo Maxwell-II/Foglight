@@ -125,3 +125,74 @@
 .logout-btn:disabled {
   opacity: 0.55;
 }
+
+/* ---------- 注册 / 登录的第二条路：Google ----------
+   注册页上它和邮箱表单并排（design-brief §8）：国内打不开 Google，
+   只给它等于给多数人一个转圈的按钮；所以两者必须同时看得见，不能折叠。 */
+
+.wrap.login-wrap.register-wrap { max-width: 820px; }
+
+.auth-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.register-wrap .auth-split { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+.auth-split .login-card { margin-top: 28px; }
+
+.auth-alt { display: flex; flex-direction: column; gap: 14px; }
+.auth-alt__note { margin: 0; font-size: 13px; line-height: 1.8; }
+
+.google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  height: var(--field-h);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 14px;
+  text-decoration: none;
+}
+.google-btn:hover { border-color: var(--ink-2); color: var(--ink); }
+
+/* 登录页上 Google 在表单上面，中间一条「或者用邮箱」 */
+.auth-or {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0;
+  font-size: 12px;
+  color: var(--dim);
+}
+.auth-or::before,
+.auth-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+.auth-links {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 18px;
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.auth-footnote { margin-top: 20px; font-size: 13px; color: var(--dim); }
+
+.login-sub + .error-banner { margin-top: 16px; }
+
+.field__hint { font-size: 12px; color: var(--dim); }
+
+.forgot-card p { margin: 0 0 12px; font-size: 14px; line-height: 1.8; }
+.forgot-card p:last-child { margin-bottom: 0; }
+
+@media (max-width: 640px) {
+  .login-card { padding: 22px 18px; }
+  .register-wrap .auth-split { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .auth-split .login-card + .login-card { margin-top: 16px; }
+}

@@ -127,7 +127,8 @@ export interface MarkCreatePayload {
   endWordIdx: number
   surfaceText: string
   context?: string
-  bookRunId?: number
+  /** 书籍阅读批次。游客导出 / 本地迁移时显式给 null（契约要求），散篇登录阅读时省略 */
+  bookRunId?: number | null
 }
 
 export type ParagraphMode = 'blank_line' | 'single_line'
@@ -389,6 +390,8 @@ export async function exportBook(
 export interface MeDto {
   id: number
   email: string
+  /** 能不能用「导入文章」。公开版只给 owner，其余账号侧栏不出这一项、/import 直接弹回文章库 */
+  canImport: boolean
 }
 
 export interface LoginResult {
@@ -430,6 +433,73 @@ export function getMe(): Promise<MeDto> {
 
 export function getCaptcha(): Promise<CaptchaDto> {
   return request('/auth/captcha')
+}
+
+/** 后端开了哪些第三方登录。Google 没配好时是 false，前端就不画那个按钮 ——
+ *  一个点下去必然报错的按钮，比没有按钮更糟。 */
+export function getAuthProviders(): Promise<{ google: boolean }> {
+  return request('/auth/providers')
+}
+
+/**
+ * 注册。成功是 201 + 用户，并且后端已经写好登录 cookie，不用再调一次 login。
+ * 失败靠状态码区分：409 已注册 / 422 校验不过 / 429 限流 —— 调用方按 ApiError.status 分支。
+ */
+export function register(payload: { email: string; password: string }): Promise<MeDto> {
+  return request('/auth/register', { method: 'POST', body: JSON.stringify(payload) })
+}
+
+/** Google 登录的起点。浏览器整页跳过去，不是 fetch —— 回调要带着 cookie 落回本站。 */
+export const GOOGLE_START_URL = `${BASE}/auth/google/start?next=/library`
+
+// ---------- 公开库 / 游客（不需要登录）----------
+
+/** 公开库。后端硬编码只返回 created_by IS NULL 且 redistributable 的文章，形状和 /articles 一样 */
+export function listPublicArticles(): Promise<ArticleSummaryDto[]> {
+  return request('/public/articles')
+}
+
+/** 不公开（或不存在）的一律 404 —— 不区分，免得拿来探测私有文章 id */
+export function getPublicArticle(id: number): Promise<ArticleDetailDto> {
+  return request(`/public/articles/${id}`)
+}
+
+/**
+ * 游客导出。标记在浏览器里，所以连同 articleId 一起交给后端，由和登录用户同一个
+ * build_markdown() 生成 —— 导出只能有一份实现，那段复盘指令就是产品的交付物。
+ * 返回纯文本 Markdown，同样不走 request()。
+ */
+export async function exportPublic(articleId: number, marks: MarkCreatePayload[]): Promise<string> {
+  const resp = await fetch(`${BASE}/public/export`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ articleId, marks }),
+  })
+  if (!resp.ok) {
+    const detail = await resp.text().catch(() => '')
+    throw new ApiError(resp.status, detail || `导出失败（${resp.status}）`)
+  }
+  return resp.text()
+}
+
+export interface MarksImportPayload {
+  sessions: { articleId: number; finished: boolean; marks: MarkCreatePayload[] }[]
+}
+
+/** 一次最多带多少个 session（后端 MAX_IMPORT_SESSIONS）。超过的由调用方分批 */
+export const MARKS_IMPORT_BATCH = 50
+
+export interface MarksImportResultDto {
+  importedSessions: number
+  importedMarks: number
+  /** 看不到的文章（多半是已经下架）不报错，跳过并列在这里 */
+  skippedArticleIds: number[]
+}
+
+/** 把游客时期的本地标记搬进账号。**一批之内**全部成功或全部失败 */
+export function importMarks(payload: MarksImportPayload): Promise<MarksImportResultDto> {
+  return request('/marks/import', { method: 'POST', body: JSON.stringify(payload) })
 }
 
 // ---------- DTO ↔ 前端内部类型（types.ts） ----------

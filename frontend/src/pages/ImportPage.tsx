@@ -78,7 +78,7 @@ export default function ImportPage() {
         paragraphMode,
       })
       reload()
-      navigate('/')
+      navigate('/library')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '导入失败，请重试。')
       setSubmitting(false)
@@ -87,7 +87,7 @@ export default function ImportPage() {
 
   return (
     <div className="page">
-      <Link className="back-link" to="/">
+      <Link className="back-link" to="/library">
         ← 返回文章库
       </Link>
       <h1 className="title">粘贴正文导入</h1>

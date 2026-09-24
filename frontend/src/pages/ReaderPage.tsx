@@ -1,42 +1,32 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import {
-  ApiError,
-  createMark,
-  deleteMark,
-  getArticle,
-  getSession,
-  finishBookReading,
-  openBookPage,
-  toArticle,
-  toMark,
-  toMarkCreatePayload,
-  updateSession,
-  type ArticleDetailDto,
-  type SessionDetailDto,
-} from '../api/client'
+import { Link, useNavigate } from 'react-router-dom'
+import { ApiError, finishBookReading, openBookPage, toArticle, toMarkCreatePayload } from '../api/client'
 import { useMarking } from '../hooks/useMarking'
 import { useCurrentParagraph } from '../hooks/useCurrentParagraph'
+import { useReadingStore, type ReadingMode } from '../hooks/useReadingStore'
 import { ArticleBody } from '../components/reader/ArticleBody'
 import { PenToolbar } from '../components/reader/PenToolbar'
+import { guestStorageAvailable } from '../lib/guestStorage'
+import type { LoadedReading } from '../lib/readingStore'
 import { marksAt } from '../lib/pos'
 import type { Mark, Pos } from '../types'
 
 const SCROLL_DEBOUNCE_MS = 800
 const TOAST_MS = 4000
 
-export default function ReaderPage() {
-  const { sessionId: sessionIdParam } = useParams<{ sessionId: string }>()
-  const sessionId = Number(sessionIdParam)
+/**
+ * 阅读器。登录用户（/read/:sessionId）和游客（/try/:articleId）共用这一份 ——
+ * 区别全在 useReadingStore 挑出来的存储实现里，页面本身不分叉。
+ * 书相关的分支（bookRunId、翻页、结束本次阅读）只在服务端模式下出现。
+ */
+export default function ReaderPage({ mode }: { mode: ReadingMode }) {
+  const { store, bookRunId } = useReadingStore(mode)
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const bookRunId = Number(searchParams.get('run')) || undefined
 
-  const [session, setSession] = useState<SessionDetailDto | null>(null)
-  const [articleDto, setArticleDto] = useState<ArticleDetailDto | null>(null)
+  const [loaded, setLoaded] = useState<LoadedReading | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
-  // 已经落库的标记（会话详情带回来的），和 useMarking 本次会话内新建的标记分开管理——
+  // 已经存下来的标记（load 带回来的），和 useMarking 本次会话内新建的标记分开管理——
   // useMarking 没有暴露"注入初始标记"的接口（也不该有，那不是它的职责），
   // 所以已保存的走这份独立状态，渲染时和 useMarking 的 marks 合并。
   const [savedMarks, setSavedMarks] = useState<Mark[]>([])
@@ -64,19 +54,16 @@ export default function ReaderPage() {
 
   useEffect(() => {
     let cancelled = false
-    setSession(null)
-    setArticleDto(null)
+    setLoaded(null)
     setSavedMarks([])
     setLoadError(null)
 
-    getSession(sessionId)
-      .then(async (s) => {
+    store
+      .load()
+      .then((result) => {
         if (cancelled) return
-        setSession(s)
-        setSavedMarks(s.marks.map(toMark))
-        const a = await getArticle(s.articleId)
-        if (cancelled) return
-        setArticleDto(a)
+        setLoaded(result)
+        setSavedMarks(result.marks)
       })
       .catch((err: unknown) => {
         if (cancelled) return
@@ -86,9 +73,19 @@ export default function ReaderPage() {
     return () => {
       cancelled = true
     }
-  }, [sessionId])
+  }, [store])
 
+  // 游客的标记只存在这台浏览器里；浏览器连这个都不让存时，得当场说，不能等他读完才发现
+  useEffect(() => {
+    if (store.kind === 'guest' && loaded && !guestStorageAvailable()) {
+      showToast('这个浏览器不允许本地存储：关掉页面后，这次的标记不会留下', 'info', 8000)
+    }
+  }, [store.kind, loaded, showToast])
+
+  const articleDto = loaded?.article ?? null
   const article = useMemo(() => (articleDto ? toArticle(articleDto) : null), [articleDto])
+  // 书只属于登录用户。公开文章本来就不带 bookContext，这里再挡一次，游客永远走不进书的分支
+  const bookContext = store.kind === 'server' ? (articleDto?.bookContext ?? null) : null
 
   // 正文左侧的灯条：读到哪一段，哪一段亮
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -115,13 +112,12 @@ export default function ReaderPage() {
   const removeSavedMark = useCallback(
     (mark: Mark) => {
       setSavedMarks((ms) => ms.filter((m) => m.id !== mark.id))
-      const serverId = Number(mark.id.slice(1))
-      const request = deleteMark(serverId).catch(() => {
-        showToast('取消这条标记时网络出错，刷新后可能会重新出现', 'error')
+      const request = store.removeMark(mark.id).catch(() => {
+        showToast('取消这条标记时出错，刷新后可能会重新出现', 'error')
       })
       trackWrite(request)
     },
-    [showToast, trackWrite],
+    [store, showToast, trackWrite],
   )
 
   const handleWordClick = useCallback(
@@ -145,23 +141,24 @@ export default function ReaderPage() {
     [finishing, marking, savedMarks, removeSavedMark],
   )
 
-  // ---------- 本次会话新建标记的后台同步：先更新界面，再后台发请求 ----------
+  // ---------- 本次会话新建标记的后台同步：先更新界面，再后台写存储 ----------
   // useMarking 的 marks 变化后用 diff 找出这一轮新增/删除了哪些本地标记，
-  // 分别 POST / DELETE。不在点击的那一刻同步request，是为了不侵入 clickWord
+  // 分别 addMark / removeMark。不在点击的那一刻同步，是为了不侵入 clickWord
   // 的调用点、也不必预判它这次到底是新增还是取消。
-  const localToServerId = useRef<Map<string, number>>(new Map())
+  // 游客模式下存储是同步的 localStorage，这套 pending 机制照样成立，只是永远不会真的等。
+  const localToStoredId = useRef<Map<string, string>>(new Map())
   const pendingCancel = useRef<Set<string>>(new Set())
   const prevHookMarks = useRef<Mark[]>([])
   useEffect(() => {
     marking.reset()
-    localToServerId.current.clear()
+    localToStoredId.current.clear()
     pendingCancel.current.clear()
     prevHookMarks.current = []
     setFinishing(false)
-  }, [sessionId]) // marking methods are stable; session identity is the reset boundary
+  }, [store.key]) // marking methods are stable; the reading identity is the reset boundary
 
   useEffect(() => {
-    if (!session || !article) return
+    if (!loaded || !article) return
     const prev = prevHookMarks.current
     const prevIds = new Set(prev.map((m) => m.id))
     const currIds = new Set(marking.marks.map((m) => m.id))
@@ -169,65 +166,62 @@ export default function ReaderPage() {
     for (const mark of marking.marks) {
       if (prevIds.has(mark.id)) continue
       const payload = toMarkCreatePayload(mark, article.paragraphs)
-      const request = createMark(session.id, { ...payload, ...(bookRunId ? { bookRunId } : {}) })
-        .then((dto) => {
+      const request = store
+        .addMark(mark, payload)
+        .then((storedId) => {
           if (pendingCancel.current.delete(mark.id)) {
-            // 还没落库就已经被用户点掉了：补一刀删除，界面早已经是"没有"的状态
-            return deleteMark(dto.id).catch(() => undefined)
+            // 还没存下来就已经被用户点掉了：补一刀删除，界面早已经是"没有"的状态
+            return store.removeMark(storedId).catch(() => undefined)
           }
-          localToServerId.current.set(mark.id, dto.id)
+          localToStoredId.current.set(mark.id, storedId)
         })
         .catch(() => {
-          showToast('有一条标记没能存到服务器，请重新点一下', 'error')
+          showToast('有一条标记没能存下来，请重新点一下', 'error')
         })
       trackWrite(request)
     }
 
     for (const mark of prev) {
       if (currIds.has(mark.id)) continue
-      const serverId = localToServerId.current.get(mark.id)
-      if (serverId === undefined) {
+      const storedId = localToStoredId.current.get(mark.id)
+      if (storedId === undefined) {
         pendingCancel.current.add(mark.id)
         continue
       }
-      localToServerId.current.delete(mark.id)
-      const request = deleteMark(serverId).catch(() => {
-        showToast('取消这条标记时网络出错，刷新后可能会重新出现', 'error')
+      localToStoredId.current.delete(mark.id)
+      const request = store.removeMark(storedId).catch(() => {
+        showToast('取消这条标记时出错，刷新后可能会重新出现', 'error')
       })
       trackWrite(request)
     }
 
     prevHookMarks.current = marking.marks
-  }, [marking.marks, session, article, showToast, bookRunId, trackWrite])
+  }, [marking.marks, loaded, article, store, showToast, trackWrite])
 
-  // ---------- 崩溃保险：整份标记镜像到 localStorage ----------
+  // ---------- 崩溃保险：整份标记镜像一份（只有服务端实现真的会写） ----------
   useEffect(() => {
-    if (!session) return
-    try {
-      localStorage.setItem(`reading-saas:session:${session.id}:marks`, JSON.stringify(allMarks))
-    } catch {
-      // 存不进去（隐私模式 / 配额满）不是致命问题，忽略
-    }
-  }, [session, allMarks])
+    if (!loaded) return
+    store.snapshot(allMarks)
+  }, [store, loaded, allMarks])
 
-  // ---------- 阅读进度：滚动防抖后 PATCH ----------
+  // ---------- 阅读进度：滚动防抖后保存 ----------
   const scrollRestored = useRef(false)
   useEffect(() => {
     scrollRestored.current = false
-  }, [sessionId])
+  }, [store.key])
   useEffect(() => {
-    if (!session || !article || scrollRestored.current) return
+    if (!loaded || !article || scrollRestored.current) return
     scrollRestored.current = true
-    requestAnimationFrame(() => window.scrollTo(0, session.scrollPosition))
-  }, [session, article])
+    requestAnimationFrame(() => window.scrollTo(0, loaded.scrollPosition))
+  }, [loaded, article])
 
   useEffect(() => {
-    if (!session) return
+    if (!loaded) return
     let timer: number | undefined
     const onScroll = () => {
       window.clearTimeout(timer)
       timer = window.setTimeout(() => {
-        updateSession(sessionId, { scrollPosition: Math.round(window.scrollY) }).catch(() => {
+        store.saveScroll(Math.round(window.scrollY)).catch(() => {
           // 阅读进度不是关键数据，静默失败，下次滚动会再存一次
         })
       }, SCROLL_DEBOUNCE_MS)
@@ -237,10 +231,12 @@ export default function ReaderPage() {
       window.removeEventListener('scroll', onScroll)
       window.clearTimeout(timer)
     }
-  }, [session, sessionId])
+  }, [loaded, store])
 
   // ---------- 断网提示 ----------
+  // 游客的标记本来就只在浏览器里，断不断网都不影响，说了反而吓人
   useEffect(() => {
+    if (store.kind !== 'server') return
     const onOffline = () => showToast('网络已断开，标记会先留在本地，恢复后请确认已同步', 'error', 0)
     const onOnline = () => showToast('网络已恢复', 'info')
     window.addEventListener('offline', onOffline)
@@ -249,47 +245,48 @@ export default function ReaderPage() {
       window.removeEventListener('offline', onOffline)
       window.removeEventListener('online', onOnline)
     }
-  }, [showToast])
+  }, [store.kind, showToast])
 
   // ---------- 完成阅读 ----------
   const finish = useCallback(async () => {
-    if (!session || finishing) return
+    if (!loaded || finishing) return
     setFinishing(true)
     await flushWrites()
-    if (articleDto?.bookContext && bookRunId) {
+    if (bookContext && bookRunId) {
       try {
-        await finishBookReading(articleDto.bookContext.bookId, bookRunId)
-        navigate(`/books/${articleDto.bookContext.bookId}/review?run=${bookRunId}`)
+        await finishBookReading(bookContext.bookId, bookRunId)
+        navigate(`/books/${bookContext.bookId}/review?run=${bookRunId}`)
       } catch {
         showToast('结束本次阅读失败，请重试', 'error')
         setFinishing(false)
       }
       return
     }
-    updateSession(session.id, { status: 'finished' })
+    store
+      .finish()
       .catch(() => {
-        // 状态没存上也不阻塞去汇总页；Review 页会重新拉一次会话
+        // 状态没存上也不阻塞去汇总页；汇总页会重新读一次
       })
       .finally(() => {
-        navigate(`/review/${session.id}`)
+        navigate(store.reviewPath)
       })
-  }, [session, finishing, navigate, articleDto, bookRunId, showToast, flushWrites])
+  }, [loaded, finishing, navigate, bookContext, bookRunId, showToast, flushWrites, store])
 
   const goBookPage = useCallback(
     async (articleId: number, finishCurrent: boolean) => {
-      if (!session || !articleDto?.bookContext || !bookRunId || finishing) return
+      if (!loaded || !bookContext || !bookRunId || finishing) return
       setFinishing(true)
       await flushWrites()
       try {
-        if (finishCurrent) await updateSession(session.id, { status: 'finished' })
-        const opened = await openBookPage(articleDto.bookContext.bookId, bookRunId, articleId)
+        if (finishCurrent) await store.finish()
+        const opened = await openBookPage(bookContext.bookId, bookRunId, articleId)
         navigate(`/read/${opened.sessionId}?run=${bookRunId}`)
       } catch {
         showToast('翻页失败，请重试', 'error')
         setFinishing(false)
       }
     },
-    [session, articleDto, bookRunId, finishing, navigate, showToast, flushWrites],
+    [loaded, bookContext, bookRunId, finishing, navigate, showToast, flushWrites, store],
   )
 
   // 粉笔延伸中，状态条要报「起点是哪个词」——只在这一状态下算，其余时候是 null
@@ -312,12 +309,12 @@ export default function ReaderPage() {
     return (
       <div className="wrap">
         <p className="error-banner">{loadError}</p>
-        <Link to="/">返回文章库</Link>
+        <Link to={store.homePath}>{store.homeLabel}</Link>
       </div>
     )
   }
 
-  if (!session || !article || !articleDto) {
+  if (!loaded || !article || !articleDto) {
     return (
       <div className="wrap">
         <p className="dim">加载中…</p>
@@ -332,21 +329,23 @@ export default function ReaderPage() {
         state={marking.state}
         counts={counts}
         anchorText={anchorText}
-        backTo={articleDto.bookContext ? `/books/${articleDto.bookContext.bookId}` : '/'}
-        backLabel={articleDto.bookContext ? '返回目录' : '返回文章'}
+        backTo={bookContext ? `/books/${bookContext.bookId}` : store.homePath}
+        backLabel={bookContext ? '返回目录' : store.homeLabel}
         title={article.title}
         onSetPen={marking.setPen}
         onCancel={marking.cancel}
         onFinish={finish}
-        finishLabel={articleDto.bookContext ? '结束本次阅读' : '读完了'}
+        finishLabel={bookContext ? '结束本次阅读' : '读完了'}
       />
 
       {/* 640px 一栏，居中。返回和标题都搬进顶栏了，这里只剩正文本身 */}
       <div className="reader-column">
         <h1 className="article-title">{article.title}</h1>
         <div className="meta">
-          {articleDto.bookContext && `${articleDto.bookContext.sectionTitle} · 第 ${articleDto.bookContext.pageNumber}/${articleDto.bookContext.pageCount} 页 · `}
+          {bookContext && `${bookContext.sectionTitle} · 第 ${bookContext.pageNumber}/${bookContext.pageCount} 页 · `}
           {article.author || '佚名'} · {article.wordCount} 词 · 约 {article.estMinutes} 分钟
+          {/* 不是提示条，只是 meta 行尾一句：说实话，但不抢正文 */}
+          {store.kind === 'guest' && ' · 未登录，标记只存在这台浏览器里'}
         </div>
 
         {/* 包一层只为给灯条的 IntersectionObserver 一个查询根；
@@ -358,30 +357,26 @@ export default function ReaderPage() {
             preview={marking.preview}
             onWordClick={handleWordClick}
             onWordHover={marking.hoverWord}
-            layout={articleDto.bookPageLayout}
-            imageUrl={
-              articleDto.bookContext
-                ? (key) => `/api/books/${articleDto.bookContext!.bookId}/assets/${key}`
-                : undefined
-            }
+            layout={store.kind === 'server' ? articleDto.bookPageLayout : null}
+            imageUrl={bookContext ? (key) => `/api/books/${bookContext.bookId}/assets/${key}` : undefined}
             currentParagraph={currentParagraph}
           />
         </div>
 
-        {articleDto.bookContext && bookRunId && (
+        {bookContext && bookRunId && (
           <nav className="book-page-nav" aria-label="书页导航">
             <button
               className="btn-secondary"
-              disabled={!articleDto.bookContext.previousArticleId || finishing}
-              onClick={() => void goBookPage(articleDto.bookContext!.previousArticleId!, false)}
+              disabled={!bookContext.previousArticleId || finishing}
+              onClick={() => void goBookPage(bookContext.previousArticleId!, false)}
             >
               ← 上一页
             </button>
-            {articleDto.bookContext.nextArticleId ? (
+            {bookContext.nextArticleId ? (
               <button
                 className="btn-primary"
                 disabled={finishing}
-                onClick={() => void goBookPage(articleDto.bookContext!.nextArticleId!, true)}
+                onClick={() => void goBookPage(bookContext.nextArticleId!, true)}
               >
                 读完本页，下一页 →
               </button>

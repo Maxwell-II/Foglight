@@ -1,0 +1,13 @@
+/**
+ * 对外文案里「还会换」的那几样，集中放这里，改的时候不用满仓库找。
+ */
+
+/** 落地页 tagline。候选见 public-release.md §5（还有「不必每个词都懂」），定稿前随时可换 */
+export const TAGLINE = '看不清也能往前读'
+
+/**
+ * 忘记密码的人工联系方式（v1 不做自助重置，user-flows §0）。
+ * 空字符串 = 还没定：/forgot 显示「联系方式即将公布」，不留一个点了没反应的死链接。
+ * 填邮箱会渲染成 mailto 链接，填别的（微信号之类）原样显示。
+ */
+export const SUPPORT_CONTACT: string = ''
