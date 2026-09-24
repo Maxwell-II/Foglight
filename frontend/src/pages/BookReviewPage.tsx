@@ -127,7 +127,7 @@ export default function BookReviewPage() {
 
   if (batch) {
     return (
-      <div className="wrap">
+      <div className="page">
         <Link className="back-link" to={`/books/${bookId}`}>← 返回目录</Link>
         <h1 className="title">回顾批次</h1>
         <p className="dim">第 {batch.pageNumbers.join('、')} 页 · {batch.markCount} 处标记</p>
@@ -144,7 +144,7 @@ export default function BookReviewPage() {
   }
 
   return (
-    <div className="wrap">
+    <div className="page">
       <Link className="back-link" to={`/books/${bookId}`}>← 返回目录</Link>
       <h1 className="title">选择待回顾内容</h1>
       <p className="dim">默认只选择本次新增标记。以前留下的内容由你决定是否一起处理。</p>

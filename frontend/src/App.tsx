@@ -6,15 +6,16 @@ import ImportPage from './pages/ImportPage'
 import ReaderPage from './pages/ReaderPage'
 import ReviewPage from './pages/ReviewPage'
 import AppActions from './components/AppActions'
+import AppShell from './components/AppShell'
 import RequireAuth from './components/RequireAuth'
 import LoginPage from './pages/LoginPage'
 import BookReviewPage from './pages/BookReviewPage'
 
 function NotFound() {
   return (
-    <div className="wrap">
+    <div className="page">
       <p className="dim">页面不存在。</p>
-      <Link to="/">返回文章库</Link>
+      <Link to="/">返回文章</Link>
     </div>
   )
 }
@@ -47,15 +48,22 @@ export default function App() {
             </RequireAuth>
           }
         >
-          <Route path="/" element={<LibraryPage />} />
-          <Route path="/import" element={<ImportPage />} />
-          <Route path="/books" element={<BooksPage />} />
-          <Route path="/books/:bookId" element={<BookDetailPage />} />
-          <Route path="/books/:bookId/review" element={<BookReviewPage />} />
+          {/* 阅读器**故意在壳外面**：稿子里读的时候侧栏收起，整屏只剩正文。
+              它也是唯一一个自带顶栏的页面。 */}
           <Route path="/read/:sessionId" element={<ReaderPage />} />
-          <Route path="/review/:sessionId" element={<ReviewPage />} />
-          <Route path="/index.html" element={<Navigate to="/" replace />} />
-          <Route path="*" element={<NotFound />} />
+
+          {/* 其余页面套 <AppShell>：左侧栏 + 主区。壳是 layout route，
+              页面之间切换时不重挂，所以侧栏那轮 /articles + /books 只打一次。 */}
+          <Route element={<AppShell />}>
+            <Route path="/" element={<LibraryPage />} />
+            <Route path="/import" element={<ImportPage />} />
+            <Route path="/books" element={<BooksPage />} />
+            <Route path="/books/:bookId" element={<BookDetailPage />} />
+            <Route path="/books/:bookId/review" element={<BookReviewPage />} />
+            <Route path="/review/:sessionId" element={<ReviewPage />} />
+            <Route path="/index.html" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<NotFound />} />
+          </Route>
         </Route>
       </Routes>
     </BrowserRouter>

@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useShellData } from '../components/AppShell'
 import {
   ApiError,
   importText,
@@ -18,6 +19,9 @@ const PREVIEW_DEBOUNCE_MS = 400
 
 export default function ImportPage() {
   const navigate = useNavigate()
+  // 壳把文章列表缓存着（侧栏计数要用），导入完必须让它重拉一次，
+  // 否则回到文章页看到的还是导入前那份
+  const { reload } = useShellData()
   const [title, setTitle] = useState('')
   const [author, setAuthor] = useState('')
   const [sourceName, setSourceName] = useState('')
@@ -73,6 +77,7 @@ export default function ImportPage() {
         text,
         paragraphMode,
       })
+      reload()
       navigate('/')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '导入失败，请重试。')
@@ -81,7 +86,7 @@ export default function ImportPage() {
   }
 
   return (
-    <div className="wrap">
+    <div className="page">
       <Link className="back-link" to="/">
         ← 返回文章库
       </Link>

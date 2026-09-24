@@ -11,6 +11,8 @@ interface Props {
   onWordHover: (pos: Pos) => void
   layout?: BookPageLayoutItem[] | null
   imageUrl?: (assetKey: string) => string
+  /** 正文左侧那根灯条落在哪一段；-1 = 不画。由 useCurrentParagraph 算 */
+  currentParagraph?: number
 }
 
 interface Flags {
@@ -24,7 +26,16 @@ const clsOf = (f: Flags, base: string) =>
     .filter(Boolean)
     .join(' ')
 
-export function ArticleBody({ paragraphs, marks, preview, onWordClick, onWordHover, layout, imageUrl }: Props) {
+export function ArticleBody({
+  paragraphs,
+  marks,
+  preview,
+  onWordClick,
+  onWordHover,
+  layout,
+  imageUrl,
+  currentParagraph = -1,
+}: Props) {
   const renderParagraph = (words: string[], p: number) => {
         // 先算出每个词的高亮状态，渲染时还要用它决定词间空格要不要一起高亮
         const flags: Flags[] = words.map((_, w) => {
@@ -38,7 +49,8 @@ export function ArticleBody({ paragraphs, marks, preview, onWordClick, onWordHov
         })
 
         return (
-          <p className="paragraph" key={p}>
+          // data-p 是 useCurrentParagraph 找段落用的锚点，别当成装饰删掉
+          <p className={`paragraph${p === currentParagraph ? ' is-current' : ''}`} data-p={p} key={p}>
             {words.map((word, w) => {
               const f = flags[w]
               const next = flags[w + 1]

@@ -1,12 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import {
-  ApiError,
-  createSession,
-  listArticles,
-  type ArticleLevel,
-  type ArticleSummaryDto,
-} from '../api/client'
+import { ApiError, createSession, type ArticleLevel, type ArticleSummaryDto } from '../api/client'
+import { useShellData } from '../components/AppShell'
+import { ListPanel, ListRow, MarkedRowState } from '../components/ListPanel'
 
 const LEVEL_STORAGE_KEY = 'reading.libraryLevel'
 
@@ -33,24 +29,10 @@ function readStoredLevel(): LevelFilter {
 
 export default function LibraryPage() {
   const navigate = useNavigate()
-  const [articles, setArticles] = useState<ArticleSummaryDto[] | null>(null)
+  const { articles, error: shellError } = useShellData()
   const [error, setError] = useState<string | null>(null)
   const [startingId, setStartingId] = useState<number | null>(null)
   const [level, setLevel] = useState<LevelFilter>(readStoredLevel)
-
-  useEffect(() => {
-    let cancelled = false
-    listArticles()
-      .then((list) => {
-        if (!cancelled) setArticles(list)
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err))
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   const selectLevel = (next: LevelFilter) => {
     setLevel(next)
@@ -94,96 +76,82 @@ export default function LibraryPage() {
     }
   }
 
+  const shown = error ?? shellError
+
   return (
-    <div className="wrap">
-      <div className="site-header">
-        <span className="brand">
-          Foglight <span className="brand__sub">雾灯</span>
-        </span>
-      </div>
-
-      <div className="library-header">
-        <h1 className="title">文章库</h1>
-        <div className="library-header__actions">
-          {/* 书是另一个入口，不是另一套阅读器：首页保持短文默认不变（§0.2） */}
-          <Link className="back-link" to="/books">
-            书架 →
-          </Link>
-          <Link className="btn-primary" to="/import">
-            + 导入文章
-          </Link>
+    <div className="page">
+      <header className="page-header">
+        <div className="page-header__text">
+          <h1 className="title">文章</h1>
+          <p className="page-header__sub">按篇幅挑一篇。</p>
         </div>
-      </div>
 
-      {error && <p className="error-banner">{error}</p>}
-
-      {articles === null && !error && <p className="dim">加载中…</p>}
-
-      {articles && articles.length === 0 && (
-        <p className="dim">还没有文章，先去导入一篇。</p>
-      )}
-
-      {articles && articles.length > 0 && (
-        <>
-          <div className="level-tabs">
+        {articles && articles.length > 0 && (
+          <div className="segmented" role="group" aria-label="篇幅">
             {(['short', 'medium', 'long', 'all'] as const).map((lv) => (
               <button
                 key={lv}
                 type="button"
-                className={`level-tab${level === lv ? ' is-active' : ''}`}
+                aria-pressed={level === lv}
                 onClick={() => selectLevel(lv)}
               >
-                {LEVEL_LABELS[lv]} ({counts[lv]})
+                {LEVEL_LABELS[lv]}
+                <span className="segmented__count">{counts[lv]}</span>
               </button>
             ))}
           </div>
+        )}
+      </header>
 
-          {filtered && filtered.length === 0 && level === 'short' && (
-            <p className="dim">
+      {shown && <p className="error-banner">{shown}</p>}
+
+      {articles === null && !shown && <p className="dim">加载中…</p>}
+
+      {articles && articles.length === 0 && <p className="dim">还没有文章，先去导入一篇。</p>}
+
+      {filtered && filtered.length === 0 && (
+        <p className="dim">
+          {level === 'short' ? (
+            <>
               还没有短文，<Link to="/import">去导入一篇</Link>
-            </p>
+            </>
+          ) : (
+            '这个档位还没有文章。'
           )}
-          {filtered && filtered.length === 0 && level !== 'short' && (
-            <p className="dim">这个档位还没有文章。</p>
-          )}
+        </p>
+      )}
 
-          {filtered && filtered.length > 0 && (
-            <ul className="article-grid">
-              {filtered.map((a) => (
-                <li key={a.id} className="article-card">
-                  <button
-                    className={`article-card__button${a.isRead ? ' is-read' : ''}`}
-                    disabled={startingId !== null}
-                    onClick={() => startReading(a)}
-                  >
-                    <h2 className="article-card__title">{a.title}</h2>
-                    <div className="article-card__meta">
-                      {a.isRead && <span className="read-badge">已读</span>}
-                      {a.resumeSessionId !== null && <span className="read-badge">读到一半</span>}
-                      {a.author ?? '佚名'} · {a.wordCount} 词 · 约 {a.estMinutes} 分钟
-                    </div>
-                    {a.topics.length > 0 && (
-                      <div className="article-card__topics">
-                        {a.topics.map((t) => (
-                          <span className="topic-chip" key={t}>
-                            {t}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    {startingId === a.id && <div className="dim">开始阅读中…</div>}
-                  </button>
-                  {/* 必须放在 button 外面：HTML 不允许 button 里再嵌可交互元素 */}
-                  {a.lastMarksSessionId !== null && (
-                    <Link className="article-card__marks" to={`/review/${a.lastMarksSessionId}`}>
-                      上次标了 {a.lastMarksCount} 处 →
-                    </Link>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
+      {filtered && filtered.length > 0 && (
+        <ListPanel columns={['标题', '篇幅', '状态']}>
+          {filtered.map((a) => (
+            <ListRow
+              key={a.id}
+              tone={a.resumeSessionId !== null ? 'reading' : a.isRead ? 'read' : null}
+              title={a.title}
+              sub={
+                <>
+                  {a.author ?? '佚名'}
+                  {a.topics.length > 0 && ` · ${a.topics.join(' · ')}`}
+                </>
+              }
+              meta={
+                <>
+                  {a.wordCount} 词
+                  <span className="list-row__minutes">约 {a.estMinutes} 分钟</span>
+                </>
+              }
+              state={
+                startingId === a.id ? (
+                  <span className="list-row__state is-unread">打开中…</span>
+                ) : (
+                  <MarkedRowState item={a} />
+                )
+              }
+              disabled={startingId !== null}
+              onOpen={() => startReading(a)}
+            />
+          ))}
+        </ListPanel>
       )}
     </div>
   )

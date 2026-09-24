@@ -1,53 +1,113 @@
 :root {
-  /* Foglight 设计 token（2026-09-18 定稿）。变量名沿用项目原有写法
-     （--ink / --dim 而不是设计稿里的 --text / --text-muted），
-     只换值和新增几个，避免把「换皮」变成「全文件改名」。 */
-  --bg: #f7f4ee;
-  --ink: #23201b;
-  --ink-2: #4a443b;
-  --dim: #6b6459;
-  --line: #e2dcd0;
-  --line-strong: #c9c2b4;
-  --yellow: #ffe08a;
+  /* Foglight 设计 token v2「雾与灯」（2026-09-23 定稿，源文件 foglight-tokens-v2.css）。
+     沿用 2026-09-18 那版的原则：变量名保持项目原有写法（--ink / --dim 而不是稿子里的
+     --text / --text-muted），只换值、只新增，不把「换皮」变成「全文件改名」。
+
+     原则：界面全部是冷灰蓝的「雾」，只有标记和品牌小灯是暖色。
+     主按钮用雾里最深的墨，不用暖黄——黄色只代表「陌生词」，按钮也黄就像一个被标过的词。 */
+
+  /* ---- 雾：底与层 ---- */
+  --bg: #e8ecf0;
+  --shell: #dee4ea;   /* 侧栏、分段控件底 */
+  --surface: #f5f7f9; /* 顶栏、次级面板 */
+  --raised: #ffffff;  /* 卡片、列表面板、选中的分段 */
+  --fog: radial-gradient(1100px 560px at 75% -12%, #f6f8fa 0%, rgba(246, 248, 250, 0) 62%);
+
+  /* ---- 文字（稿子里叫 --text / --text-2 / --text-muted）---- */
+  --ink: #1b232c;
+  --ink-2: #3f4a56;
+  --dim: #56616e;     /* 压在 --shell 上仍 ≥ 4.5:1 */
+
+  --line: #d3dae1;
+  --line-strong: #c3ccd5;
+
+  /* ---- 主操作：雾里最深的墨 ----
+     --ink 是字的颜色，--ink-solid 是墨底按钮的底色。亮色下两者差 4 个点
+     （字要再冷一点），暗色下相等。别把按钮写成 background: var(--ink)。 */
+  --ink-solid: #1f2b38;
+  --on-ink: #f5f7f9;
+  --ink-ghost: rgba(245, 247, 249, 0.14);   /* 墨底上的次级按钮 */
+
+  /* ---- 灯：品牌小灯、在读进度、当前段落灯条 ---- */
+  --lamp: #f2b533;
+  --lamp-glow: rgba(242, 181, 51, 0.45);
+  --lamp-track: #d3dae1;
+  --lamp-tint: rgba(242, 181, 51, 0.1);     /* 在读那一行的底色 */
+
+  /* ---- 两支笔：语义不变 ---- */
+  --yellow: #ffe59a;
   --yellow-edge: #d9a441;
-  --yellow-soft: #fff4d6;
-  --pink: #ffc9c9;
+  --yellow-soft: #fff3cc;
+  --pink: #ffd3d3;
   --pink-edge: #d9706f;
-  --pink-soft: #ffeded;
-  --preview: #cfe4ff;
-  --preview-edge: #5b9bd5;
-  --preview-soft: #eaf2fc;
-  --preview-text: #1f3c5c;
+  --pink-soft: #ffeaea;
 
-  /* ---- W3：补的 token，亮色值和原来的硬编码逐像素一致 ---- */
-  --surface: #fffdf8;
-  --surface-sunk: #f2eee6;
-  --toolbar-bg: rgba(255, 253, 248, 0.95);
+  /* 范围进行中 = 还没画完的粉，不再用蓝（v2 的改动，蓝色整条退出调色板） */
+  --preview: rgba(217, 112, 111, 0.12);
+  --preview-edge: #d9706f;
+
+  --link-hover: #8a5a00;
+  --code-text: #34404c;
+
+  --shadow-sm: 0 1px 2px rgba(27, 35, 44, 0.06), 0 4px 14px rgba(27, 35, 44, 0.05);
+  --shadow-lg: 0 2px 4px rgba(15, 20, 26, 0.05), 0 24px 60px rgba(15, 20, 26, 0.12);
+
+  /* ---- 下面这些稿子里没有，是项目自己的派生色，跟着上面一起翻 ---- */
+  --toolbar-bg: rgba(245, 247, 249, 0.9);
+  --btn-fg: var(--on-ink);
   --pink-wash: var(--pink-soft);
-  --btn-fg: #f7f4ee;
-  --danger-bg: #ffeded;
-  --danger-fg: #a33;
-  --info-bg: var(--preview-soft);
-  --info-fg: var(--preview-text);
-  --word-hover: rgba(35, 32, 27, 0.055);
+  --preview-soft: var(--pink-soft);
+  --preview-text: #a8403f;   /* 粉色系里能当正文色的那一档，#d9706f 压在 pink-soft 上不够 4.5:1 */
+  --danger-bg: var(--pink-soft);
+  --danger-fg: #a8403f;
+  --info-bg: var(--surface);
+  --info-fg: var(--ink-2);
+  --word-hover: rgba(27, 35, 44, 0.06);
 
-  /* 字体——界面中文用无衬线，正文和标题用衬线，两套互不借用 */
+  /* ---- 字体 ----
+     标题和品牌 Spectral（40px 以上用 300，品牌名和列表标题用 400，字距保持 0）；
+     英文正文 Atkinson Hyperlegible；中文界面 Noto Sans SC。三款都是 OFL。
+     ⚠️ 上线前要打包成 woff2 自托管（Noto Sans SC 必须子集化），Google Fonts 国内不稳。 */
   --font-ui: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
-  --font-read: Literata, Georgia, "Songti SC", serif;
-  --font-display: Newsreader, Georgia, serif;
+  --font-read: "Atkinson Hyperlegible", Verdana, sans-serif;
+  --font-display: Spectral, Georgia, serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  /* 圆角与控件高度——全站按钮/输入框统一走这一套，不再各写各的数字 */
-  --r-sm: 6px;
-  --r-md: 10px;
-  --r-lg: 14px;
-  --r-pill: 999px;
+  /* ---- 正文 ---- */
+  --read-size: 20px;
+  /* 稿子给的是 1.85 / 26px，那是照着 Literata 那类小 x-height 的衬线字定的。
+     换成 Atkinson Hyperlegible 之后同一套数字明显发散 —— 它的 x-height 很大，
+     行与行本来就不会粘住，再给 1.85 等于加了两次空气。
+     1.6 / 20px 是在真机上看过之后收的，别照着稿子改回去。 */
+  --read-leading: 1.6;
+  --read-measure: 640px;
+  --read-para-gap: 20px;
+
+  /* ---- 标题 ---- */
+  --display-hero: 80px;
+  --display-page: 48px;   /* 阅读器文章标题、复盘页标题 */
+  --display-row: 24px;    /* 列表里的文章标题 */
+  --title: 26px;          /* 中文页面标题 */
+
+  /* ---- 间距 ---- */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; --sp-8: 64px; --sp-9: 96px;
+
+  /* ---- 圆角：v2 不再用 pill，改成方中带圆。--r-pill 已删，别再加回来 ---- */
+  --r-sm: 9px;    /* 分段控件内的按钮 */
+  --r-md: 10px;   /* 按钮、导航行、输入框 */
+  --r-lg: 14px;   /* 列表面板、卡片 */
+  --r-xl: 18px;   /* 弹窗、演示卡 */
+
+  /* ---- 控件 ---- */
   --control-h: 44px;
+  --control-h-lg: 52px;
   --field-h: 48px;
+  --sidebar-w: 248px;
 
   /* 右上角操作区（主题 + 退出）占的宽度。**唯一真相源**：
-     .app-actions 用它当 min-width，.toolbar 用它算 padding-right 把内容让开。
-     以前这两边靠各自硬编码的 right:12 / right:54 互相让位，一改就重合。
-     往操作区里加按钮，只需要改这一个数。 */
+     现在只剩守卫的 'checking' 态还在用 .app-actions —— 壳渲染出来之后，
+     主题和退出都在侧栏页脚。等游客模式做完、壳外还有别的页面时再看要不要留。 */
   --actions-w: 104px;
 
   /* 告诉浏览器当前是哪套配色。没有这一行，UA 默认色（按钮的 buttontext、输入框、
@@ -58,64 +118,92 @@
 /* system 主题下跟随操作系统；data-theme="light" 显式覆盖时不应用这一块 */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #1a1a1a;
-    --ink: #e9e7e3;
-    --ink-2: #c9c5be;
-    --dim: #9a9793;
-    --line: #2f2e2c;
-    --line-strong: #413f3c;
-    --surface: #232322;
-    --surface-sunk: #141414;
-    --toolbar-bg: rgba(35, 35, 34, 0.95);
-    --yellow: rgba(255, 209, 102, 0.2);
+    --bg: #11151a;
+    --shell: #0c1014;
+    --surface: #161b21;
+    --raised: #1c2229;
+    --fog: radial-gradient(900px 480px at 18% -12%, rgba(242, 181, 51, 0.06) 0%, rgba(242, 181, 51, 0) 55%);
+
+    --ink: #e4e9ee;
+    --ink-2: #b7c0ca;
+    --dim: #8793a0;
+
+    --line: #252d36;
+    --line-strong: #313b46;
+
+    --ink-solid: #e4e9ee;
+    --on-ink: #11151a;
+    --ink-ghost: rgba(17, 21, 26, 0.12);
+
+    --lamp-glow: rgba(242, 181, 51, 0.55);
+    --lamp-track: #252d36;
+    --lamp-tint: rgba(242, 181, 51, 0.07);
+
+    --yellow: rgba(255, 209, 102, 0.22);
     --yellow-edge: #c8942f;
     --yellow-soft: rgba(255, 209, 102, 0.12);
     --pink: rgba(255, 138, 138, 0.2);
     --pink-edge: #c0605f;
     --pink-soft: rgba(255, 138, 138, 0.12);
-    --preview: rgba(91, 155, 213, 0.22);
-    --preview-edge: #5b9bd5;
-    --preview-soft: rgba(91, 155, 213, 0.14);
-    --preview-text: #bbd6f2;
-    --pink-wash: var(--pink-soft);
-    --btn-fg: #1a1a1a;
-    --danger-bg: #2a1f22;
+    --preview: rgba(255, 138, 138, 0.1);
+    --preview-edge: #c0605f;
+
+    --link-hover: #f2c766;
+    --code-text: #c4ccd5;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 18px rgba(0, 0, 0, 0.22);
+    --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.3), 0 24px 60px rgba(0, 0, 0, 0.4);
+
+    --toolbar-bg: rgba(22, 27, 33, 0.9);
+    --preview-text: #e0908f;
     --danger-fg: #e0908f;
-    --info-bg: var(--preview-soft);
-    --info-fg: var(--preview-text);
-    --word-hover: rgba(255, 255, 255, 0.075);
+    --word-hover: rgba(228, 233, 238, 0.08);
     color-scheme: dark;
   }
 }
 
 /* data-theme="dark" 显式选择时生效，无论系统设置如何；内容和上面那块逐条一致 */
 [data-theme='dark'] {
-  --bg: #1a1a1a;
-  --ink: #e9e7e3;
-  --ink-2: #c9c5be;
-  --dim: #9a9793;
-  --line: #2f2e2c;
-  --line-strong: #413f3c;
-  --surface: #232322;
-  --surface-sunk: #141414;
-  --toolbar-bg: rgba(35, 35, 34, 0.95);
-  --yellow: rgba(255, 209, 102, 0.2);
+  --bg: #11151a;
+  --shell: #0c1014;
+  --surface: #161b21;
+  --raised: #1c2229;
+  --fog: radial-gradient(900px 480px at 18% -12%, rgba(242, 181, 51, 0.06) 0%, rgba(242, 181, 51, 0) 55%);
+
+  --ink: #e4e9ee;
+  --ink-2: #b7c0ca;
+  --dim: #8793a0;
+
+  --line: #252d36;
+  --line-strong: #313b46;
+
+  --ink-solid: #e4e9ee;
+  --on-ink: #11151a;
+  --ink-ghost: rgba(17, 21, 26, 0.12);
+
+  --lamp-glow: rgba(242, 181, 51, 0.55);
+  --lamp-track: #252d36;
+  --lamp-tint: rgba(242, 181, 51, 0.07);
+
+  --yellow: rgba(255, 209, 102, 0.22);
   --yellow-edge: #c8942f;
   --yellow-soft: rgba(255, 209, 102, 0.12);
   --pink: rgba(255, 138, 138, 0.2);
   --pink-edge: #c0605f;
   --pink-soft: rgba(255, 138, 138, 0.12);
-  --preview: rgba(91, 155, 213, 0.22);
-  --preview-edge: #5b9bd5;
-  --preview-soft: rgba(91, 155, 213, 0.14);
-  --preview-text: #bbd6f2;
-  --pink-wash: var(--pink-soft);
-  --btn-fg: #1a1a1a;
-  --danger-bg: #2a1f22;
+  --preview: rgba(255, 138, 138, 0.1);
+  --preview-edge: #c0605f;
+
+  --link-hover: #f2c766;
+  --code-text: #c4ccd5;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 18px rgba(0, 0, 0, 0.22);
+  --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.3), 0 24px 60px rgba(0, 0, 0, 0.4);
+
+  --toolbar-bg: rgba(22, 27, 33, 0.9);
+  --preview-text: #e0908f;
   --danger-fg: #e0908f;
-  --info-bg: var(--preview-soft);
-  --info-fg: var(--preview-text);
-  --word-hover: rgba(255, 255, 255, 0.075);
+  --word-hover: rgba(228, 233, 238, 0.08);
   color-scheme: dark;
 }
 
@@ -123,135 +211,502 @@
 
 body {
   margin: 0;
-  background: var(--bg);
+  /* 雾：一层贴着视口的极淡径向光，不跟着滚动走 —— 它是环境光不是背景图 */
+  background: var(--fog), var(--bg);
+  background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-ui);
 }
 
 button { font-family: inherit; cursor: pointer; }
 
-/* ---------- 工具栏 ---------- */
-.toolbar {
-  position: sticky;
-  top: 0;
-  z-index: 10;
+/* ---------- 应用壳：左侧窄栏 + 主区（components/AppShell.tsx） ----------
+   阅读器不套这一层，它自己是 .reader-page。 */
+
+.app {
+  display: flex;
+  min-height: 100vh;
+}
+
+.app-main {
+  flex-grow: 1;
+  /* min-width:0 —— flex 子项默认 min-width:auto，里面的长表格会把整个布局撑宽，
+     症状是侧栏被挤窄、页面横向滚动。 */
+  min-width: 0;
+  padding: 48px 64px 96px;
+}
+
+.page { max-width: 1040px; }
+
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-5);
+  margin-bottom: var(--sp-5);
+}
+.page-header__text { display: flex; flex-direction: column; gap: var(--sp-2); }
+.page-header__sub { margin: 0; font-size: 14px; line-height: 1.8; color: var(--dim); }
+.page-header .title { margin: 0; }
+
+/* ---------- 侧栏 ---------- */
+
+.sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  padding: 22px 16px 16px;
+  background: var(--shell);
+  border-right: 1px solid var(--line);
+}
+
+.sidebar__brand {
   display: flex;
   align-items: center;
-  gap: 20px;
-  /* 右内边距要多让出 --actions-w：右上角那两个按钮是 fixed 的，
-     不参与这里的流，不让位就会盖住「完成阅读」。 */
-  padding: max(14px, env(safe-area-inset-top)) calc(32px + var(--actions-w)) 14px 32px;
-  background: var(--toolbar-bg);
-  backdrop-filter: blur(6px);
-  border-bottom: 1px solid var(--line);
-  transition: border-color 0.15s;
+  gap: 12px;
+  font-family: var(--font-display);
+  font-size: 26px;
+  line-height: 1;
+  color: var(--ink);
+  text-decoration: none;
 }
-/* 进入范围模式时把工具栏底边染成粉色 —— 让"现在是什么模式"一眼可见 */
-.toolbar--pink { border-bottom-color: var(--pink-edge); }
+.sidebar__brand:hover { color: var(--ink); }
 
-/* 粉笔延伸中：工具栏下面单独一条状态条，取代直接染整条工具栏的旧做法——
-   这样能放下「起点是哪个词」和「取消」按钮，而不是只靠边框变色硬撑。 */
-.status-bar {
+.sidebar__nav { display: flex; flex-direction: column; gap: var(--sp-1); }
+.sidebar__spacer { flex-grow: 1; }
+
+.nav-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: var(--control-h);
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 14px;
+  text-decoration: none;
+}
+.nav-row:hover { color: var(--ink); background: var(--surface); }
+.nav-row.is-active {
+  background: var(--raised);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink);
+  font-weight: 500;
+}
+.nav-row__label { flex-grow: 1; }
+.nav-row__count { font-size: 12px; font-weight: 400; color: var(--dim); }
+.nav-icon { flex-shrink: 0; }
+
+/* 导入是「加东西」不是「去某处」，虚线边把它和上面三个导航区分开 */
+.nav-row--ghost { border: 1px dashed var(--line-strong); }
+.nav-row--ghost:hover { border-color: var(--ink-2); }
+
+.sidebar__user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--control-h-lg);
+  padding-left: 8px;
+}
+.sidebar__user-name {
+  flex-grow: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.avatar {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: var(--lamp-track);
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-wrap: wrap;
-  gap: 10px 20px;
-  padding: 10px 16px;
-  background: var(--preview-soft);
-  border-bottom: 1px solid var(--preview-edge);
+  font-size: 13px;
+  color: var(--ink-2);
 }
-.status-bar__lead { display: flex; align-items: center; gap: 10px; }
-.status-bar__dot {
+
+/* ---------- 侧栏收起：248px 的窄栏 → 64px 的图标条 ----------
+   收起状态存在 localStorage（reading.sidebarCollapsed），刷新后还在。
+
+   ⚠️ 整块包在 min-width: 641px 里：窄屏下侧栏已经是底部 tab 条，
+   再叠一层「收起」既没意义、又会把 tab 压成一列。 */
+
+@media (min-width: 641px) {
+  .app.is-collapsed { --sidebar-w: 64px; }
+
+  .app.is-collapsed .sidebar {
+    padding-left: 10px;
+    padding-right: 10px;
+    align-items: center;
+  }
+
+  /* 品牌只剩那盏灯，切换按钮挪到它下面 —— 44px 的按钮和 10px 的灯并排放不进 44px */
+  .app.is-collapsed .sidebar__top { flex-direction: column; gap: 6px; }
+  .app.is-collapsed .sidebar__brand { padding: 0; }
+  .app.is-collapsed .sidebar__brand-name { display: none; }
+
+  /* 导航压成一列图标。字和计数收掉，指向靠 title 提示 */
+  .app.is-collapsed .sidebar__nav { align-self: stretch; }
+  .app.is-collapsed .nav-row {
+    justify-content: center;
+    padding: 0;
+    gap: 0;
+  }
+  .app.is-collapsed .nav-row__label,
+  .app.is-collapsed .nav-row__count { display: none; }
+
+  /* 用户行竖过来。名字收掉，头像留着（title 里是邮箱） */
+  .app.is-collapsed .sidebar__user {
+    flex-direction: column;
+    align-self: stretch;
+    height: auto;
+    padding: 0;
+    gap: 6px;
+  }
+  .app.is-collapsed .sidebar__user-name { display: none; }
+  .app.is-collapsed .logout-btn { padding: 0 8px; font-size: 12px; }
+}
+
+/* 展开态的品牌行：品牌占满，切换按钮贴右 */
+.sidebar__top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 0 8px;
+}
+.sidebar__brand { flex-grow: 1; min-width: 0; }
+.sidebar__toggle { width: 36px; height: 36px; }
+
+/* 底部 tab 条里没有「收起」这件事 */
+@media (max-width: 640px) {
+  .sidebar__top { display: none; }
+}
+
+/* ---------- 继续读 ---------- */
+
+.resume-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  text-decoration: none;
+}
+.resume-card:hover { border-color: var(--line-strong); color: var(--ink); }
+.resume-card__label { font-size: 11px; letter-spacing: 0.06em; color: var(--dim); }
+.resume-card__title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1.1;
+  color: var(--ink);
+}
+.resume-card__caption { font-size: 12px; color: var(--dim); }
+
+/* ---------- 灯 ---------- */
+
+.lamp {
   width: 10px;
   height: 10px;
-  border-radius: var(--r-pill);
-  background: var(--preview-edge);
+  border-radius: 999px;
+  background: var(--lamp);
+  box-shadow: 0 0 0 4px rgba(242, 181, 51, 0.16), 0 0 18px var(--lamp-glow);
   flex-shrink: 0;
 }
-.status-bar__text { font-size: 13px; color: var(--preview-text); }
-.status-bar__cancel {
-  height: 36px;
-  padding: 0 16px;
-  border: 1px solid var(--preview-edge);
-  background: var(--surface);
-  color: var(--preview-text);
-  border-radius: var(--r-pill);
-  font-family: inherit;
-  font-size: 13px;
-  white-space: nowrap;
-}
-.status-bar__cancel:hover { background: var(--preview-soft); }
+.lamp--sm { width: 8px; height: 8px; }
 
-.pens { display: flex; gap: 10px; }
-.pen {
-  display: inline-flex;
+.lamp-track {
+  display: block;
+  width: 100%;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--lamp-track);
+}
+.lamp-track__fill {
+  display: block;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--lamp);
+}
+
+/* ---------- 分段控件（篇幅、两支笔共用） ---------- */
+
+.segmented {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--shell);
+  border: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.segmented > button {
+  display: flex;
   align-items: center;
   gap: 8px;
   height: var(--control-h);
-  font-size: 14px;
-  padding: 0 14px;
-  border-radius: var(--r-pill);
-  border: 1px solid var(--line);
+  padding: 0 18px;
+  border: none;
+  border-radius: var(--r-sm);
   background: transparent;
-  color: var(--dim);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 14px;
 }
-.pen.is-active { font-weight: 500; color: var(--ink); }
-.pen--yellow.is-active { border-color: var(--yellow-edge); background: var(--yellow-soft); }
-.pen--pink.is-active { border-color: var(--pink-edge); background: var(--pink-soft); }
-.pen .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex-shrink: 0; }
-.pen--yellow .swatch { background: var(--yellow); border: 1px solid var(--yellow-edge); }
-.pen--pink .swatch { background: var(--pink); border: 1px solid var(--pink-edge); }
-.pen__badge {
-  font-size: 11px;
-  color: var(--dim);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 2px 6px;
-  background: var(--bg);
-  line-height: 1.2;
+.segmented > button[aria-pressed="true"] {
+  background: var(--raised);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
 }
-kbd {
-  font: 11px/1 ui-monospace, monospace;
+.segmented__count { font-size: 12px; color: var(--dim); }
+
+/* 面包屑。页头标题上方那一行「书」—— 返回是它的副作用，不是它的全部意义，
+   所以不写成 ← 返回书架 那种按钮语气的链接。 */
+.crumb {
+  font-size: 13px;
+  color: var(--dim);
+  text-decoration: none;
+}
+.crumb:hover { color: var(--ink); }
+.crumb::after { content: " /"; }
+
+/* ---------- 列表面板（文章 / 书 / 章节共用，components/ListPanel.tsx） ----------
+   v2 把卡片网格换成三列表：一屏能看到的篇数多一倍，而挑文章本来就是扫一列标题。 */
+
+.list-panel {
+  background: var(--raised);
   border: 1px solid var(--line);
-  border-radius: 3px;
-  padding: 2px 4px;
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.list-head,
+.list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px 180px;
+  gap: var(--sp-5);
+}
+
+.list-head {
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
   color: var(--dim);
 }
 
-/* min-width:0 + nowrap：flex:1 默认是 `1 1 0%`，允许收缩到 0；中文没有单词
-   边界，压窄了就逐字换行、把整条 toolbar 顶成一列竖字。宁可截断也不竖排。 */
-.hint-text {
+.list-rows { list-style: none; margin: 0; padding: 0; }
+
+.list-row {
+  position: relative;
+  align-items: center;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--line);
+}
+.list-row:last-child { border-bottom: none; }
+.list-row:hover { background: var(--surface); }
+/* 在读那一行透一点灯光出来 —— 扫一眼就知道上次停在哪 */
+.list-row.is-reading { background: var(--lamp-tint); }
+.list-row.is-read .list-row__open { color: var(--ink-2); }
+
+.list-row__main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+
+/* 标题按钮用 ::after 把点击区撑满整行，这样整行可点、DOM 里却只有一个按钮 ——
+   状态列里那个去复盘的链接才能合法存在（button 里不能嵌可交互元素）。 */
+.list-row__open {
+  border: none;
+  background: none;
+  padding: 0;
+  text-align: left;
+  font-family: var(--font-display);
+  font-size: var(--display-row);
+  line-height: 1.2;
+  color: var(--ink);
+}
+.list-row__open::after { content: ""; position: absolute; inset: 0; }
+.list-row__open:disabled { cursor: default; }
+.list-row__open:focus-visible { outline: 2px solid var(--ink-2); outline-offset: 3px; }
+
+.list-row__sub {
   font-size: 13px;
+  line-height: 1.6;
   color: var(--dim);
-  flex: 1;
-  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-row__len { font-size: 13px; color: var(--dim); }
+.list-row__minutes { display: block; font-size: 12px; margin-top: 2px; }
+
+.list-row__state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.list-row__state.is-reading { color: var(--ink); }
+.list-row__state.is-unread { color: var(--dim); }
+
+/* 压在整行覆盖层之上，否则点它等于点了「开始阅读」 */
+.list-row__marks {
+  position: relative;
+  font-size: 12px;
+  color: var(--pink-edge);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.list-row__marks:hover { color: var(--pink-edge); text-decoration: underline; }
+
+/* 中性版的行内链接（书架上的「目录 →」）。和 __marks 一样要压在覆盖层之上，
+   区别只在颜色：那个指向标记（粉），这个只是换个地方看。 */
+.list-row__go {
+  position: relative;
+  font-size: 12px;
+  color: var(--dim);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.list-row__go:hover { color: var(--ink); text-decoration: underline; }
+
+/* ---------- 阅读器 ---------- */
+
+.reader-page { min-height: 100vh; }
+
+.reader-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--sp-4);
+  height: 72px;
+  padding: 0 28px;
+  padding-top: env(safe-area-inset-top);
+  background: var(--toolbar-bg);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--line);
+}
+.reader-bar__left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.reader-bar__title {
+  font-size: 14px;
+  color: var(--ink-2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.right { display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
-.counts { font-size: 13px; color: var(--dim); white-space: nowrap; }
-.counts b { color: var(--ink); font-size: 15px; }
+.reader-bar__right { display: flex; align-items: center; justify-content: flex-end; gap: 18px; }
 
+.icon-button {
+  flex-shrink: 0;
+  width: var(--control-h);
+  height: var(--control-h);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--ink-2);
+}
+.icon-button:hover { background: var(--shell); color: var(--ink); }
+
+.counts { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--dim); }
+.counts__item { display: flex; align-items: center; gap: 6px; }
+.dot { width: 9px; height: 9px; border-radius: 999px; flex-shrink: 0; }
+.dot--yellow { background: var(--yellow); border: 1px solid var(--yellow-edge); }
+.dot--pink { background: var(--pink); border: 1px solid var(--pink-edge); }
+
+.swatch { width: 13px; height: 13px; border-radius: 4px; display: inline-block; flex-shrink: 0; }
+.pen--yellow .swatch { background: var(--yellow); border: 1px solid var(--yellow-edge); }
+.pen--pink .swatch { background: var(--pink); border: 1px solid var(--pink-edge); }
+.pen__badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--dim);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 1px 6px;
+  line-height: 1.2;
+}
+
+/* 正文一栏。左内边距给灯条留位置，不用负 margin —— 负 margin 在窄屏会顶出视口 */
+.reader-column {
+  max-width: calc(var(--read-measure) + 56px);
+  margin: 0 auto;
+  padding: 56px 20px 160px 36px;
+}
+
+/* ---------- 底部胶囊：范围标记进行中 ----------
+   取代了「把工具栏底边染色」：颜色能说「现在是粉笔」，
+   说不了「起点定在哪个词」，而标到一半时后者才是唯一要紧的信息。 */
+
+.capsule {
+  position: fixed;
+  left: 50%;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  max-width: calc(100vw - 32px);
+  padding: 10px 12px 10px 20px;
+  border-radius: var(--r-lg);
+  background: var(--ink-solid);
+  color: var(--on-ink);
+  box-shadow: var(--shadow-lg);
+  font-size: 14px;
+}
+/* armed 态只有一句话、没有按钮，右内边距补齐 */
+.capsule--hint { padding-right: 20px; }
+.capsule__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.capsule__anchor { font-family: var(--font-read); font-weight: 700; }
+.capsule__aside { margin-left: 10px; opacity: 0.7; }
+.capsule__cancel {
+  flex-shrink: 0;
+  height: 36px;
+  padding: 0 14px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: var(--ink-ghost);
+  color: var(--on-ink);
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.capsule__cancel:hover { background: rgba(245, 247, 249, 0.24); }
+
+/* ---------- 按钮 ---------- */
 .btn-primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   height: var(--control-h);
-  border: 1px solid var(--ink);
-  background: var(--ink);
+  border: 1px solid var(--ink-solid);
+  background: var(--ink-solid);
   color: var(--btn-fg);
   font-size: 14px;
   padding: 0 20px;
-  border-radius: var(--r-pill);
+  border-radius: var(--r-md);
   white-space: nowrap;
   text-decoration: none;
 }
 .btn-primary:hover { opacity: 0.92; }
 .btn-primary:disabled { opacity: 0.5; cursor: default; }
 
-/* ---------- 品牌 / 页头 ---------- */
 .brand {
   display: flex;
   align-items: baseline;
@@ -261,43 +716,22 @@ kbd {
   color: var(--ink);
   text-decoration: none;
 }
-.brand__sub { font-family: var(--font-ui); font-size: 12px; color: var(--dim); }
-
-.site-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding-bottom: 20px;
-  margin-bottom: 28px;
-  border-bottom: 1px solid var(--line);
-}
-.site-header .back-link { margin-bottom: 0; }
 
 /* ---------- 正文 ---------- */
 .wrap { max-width: 720px; margin: 0 auto; padding: 24px 20px 120px; }
 
-.picker { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 28px; }
-.picker button {
-  font-size: 12px;
-  padding: 5px 10px;
-  border-radius: 14px;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--dim);
-}
-.picker button.is-active { border-color: var(--ink); color: var(--ink); }
 
-.title { font-size: 28px; font-weight: 500; margin: 0 0 6px; }
+.title { font-size: var(--title); font-weight: 500; margin: 0 0 6px; }
 .meta { font-size: 13px; color: var(--dim); margin-bottom: 32px; }
 
 /* 阅读器里的文章标题——和上面 .title（页面级标题，如「文章库」「登录」）
    是两种东西：这个是正文的一部分，走衬线展示字体，不走界面无衬线字体。 */
 .article-title {
   font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 34px;
-  line-height: 1.2;
+  /* 40px 以上用 300：Spectral 在大字号下 400 显得糊，稿子里统一压到 Light */
+  font-weight: 300;
+  font-size: var(--display-page);
+  line-height: 1.15;
   margin: 0 0 6px;
 }
 
@@ -308,10 +742,24 @@ kbd {
   -webkit-touch-callout: none;
 }
 .paragraph {
+  position: relative;   /* 灯条的定位上下文 */
   font-family: var(--font-read);
-  font-size: 20px;
-  line-height: 1.9;      /* 也把点击目标撑高，为触屏做准备 */
-  margin: 0 0 26px;
+  font-size: var(--read-size);
+  line-height: var(--read-leading);   /* 也把点击目标撑高，为触屏做准备 */
+  margin: 0 0 var(--read-para-gap);
+}
+
+/* 当前段落的灯条。绝对定位在段落左外侧 —— .reader-column 的左内边距给它留了位 */
+.paragraph.is-current::before {
+  content: "";
+  position: absolute;
+  left: -25px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--lamp);
+  box-shadow: 0 0 12px var(--lamp-glow);
 }
 
 .word {
@@ -348,16 +796,16 @@ kbd {
 .mark-list { list-style: none; padding: 0; margin: 0; }
 .mark-list li {
   font-size: 14px;
-  background: var(--surface);
+  background: var(--raised);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--r-md);
   padding: 8px 12px;
   margin-bottom: 6px;
 }
 .mark-list .tag {
   font-size: 11px;
   padding: 1px 7px;
-  border-radius: 10px;
+  border-radius: var(--r-sm);
   margin-right: 8px;
 }
 .li-yellow .tag { background: var(--yellow); }
@@ -366,9 +814,9 @@ kbd {
 .export {
   width: 100%;
   min-height: 220px;
-  font: 12.5px/1.5 ui-monospace, Consolas, monospace;
+  font: 12.5px/1.5 var(--font-mono);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--r-md);
   padding: 12px;
   margin-bottom: 12px;
   resize: vertical;
@@ -391,84 +839,10 @@ kbd {
   color: var(--danger-fg);
   font-size: 13px;
   padding: 10px 14px;
-  border-radius: 6px;
+  border-radius: var(--r-md);
   margin-bottom: 16px;
 }
 
-.library-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 8px;
-}
-.library-header .title { margin: 0; }
-.library-header .btn-primary { text-decoration: none; display: inline-block; }
-
-.article-grid {
-  list-style: none;
-  margin: 16px 0 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 14px;
-}
-.article-card { margin: 0; }
-.article-card__button {
-  width: 100%;
-  text-align: left;
-  background: var(--surface);
-  /* 必须显式写。<button> 的文字颜色不从 body 继承，UA 给的是 buttontext（黑），
-     暗色下就是深底黑字 —— 首页文章标题看不见的原因就是这里。 */
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  padding: 22px 24px;
-  display: block;
-}
-.article-card__button:hover { border-color: var(--line-strong); }
-.article-card__button:disabled { opacity: 0.6; cursor: default; }
-.article-card__title {
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 22px;
-  line-height: 1.3;
-  margin: 0 0 8px;
-}
-.article-card__meta { font-size: 13px; color: var(--dim); }
-/* 读完过的整卡压暗一档：扫一眼就知道哪些读过，不用逐个点开。
-   hover 恢复满色，重读时不至于要在灰卡上找字。 */
-.article-card__button.is-read { opacity: 0.55; }
-.article-card__button.is-read:hover { opacity: 1; }
-/* 回到上一次标记的入口。在卡片按钮之外，所以已读卡片压暗时它不跟着暗 —— 
-   它恰恰是已读卡片上最该点的东西。 */
-.article-card__marks {
-  display: inline-block;
-  margin-top: 6px;
-  padding: 2px 2px;
-  font-size: 12px;
-  color: var(--pink-edge);
-  text-decoration: none;
-}
-.article-card__marks:hover { text-decoration: underline; }
-
-.read-badge {
-  display: inline-block;
-  margin-right: 6px;
-  padding: 1px 7px;
-  border-radius: 10px;
-  font-size: 11px;
-  border: 1px solid var(--line);
-  color: var(--dim);
-}
-.article-card__topics { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-.topic-chip {
-  font-size: 11px;
-  color: var(--dim);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 2px 8px;
-}
 
 .import-form {
   display: flex;
@@ -501,38 +875,19 @@ kbd {
   z-index: 20;
   font-size: 13px;
   padding: 10px 16px;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   max-width: 320px;
 }
 .sync-toast--error { background: var(--danger-bg); border: 1px solid var(--pink-edge); color: var(--danger-fg); }
-.sync-toast--info { background: var(--info-bg); border: 1px solid var(--preview-edge); color: var(--info-fg); }
-
-/* ---------- W1：篇幅档位标签 / 导入预览 ---------- */
-
-.level-tabs { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0; }
-.level-tabs .level-tab {
-  height: var(--control-h);
-  font-size: 14px;
-  padding: 0 20px;
-  border-radius: var(--r-pill);
-  border: 1px solid var(--line);
-  background: transparent;
-  color: var(--ink);
-}
-.level-tabs .level-tab.is-active {
-  border-color: var(--ink);
-  background: var(--ink);
-  color: var(--btn-fg);
-  font-weight: 500;
-}
+.sync-toast--info { background: var(--info-bg); border: 1px solid var(--line-strong); color: var(--info-fg); }
 
 .field--checkbox { flex-direction: row; align-items: center; gap: 8px; }
 .field--checkbox input { width: auto; }
 
 .import-preview {
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--r-md);
   padding: 10px 14px;
   background: var(--surface);
 }
@@ -563,7 +918,7 @@ kbd {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+  border-radius: var(--r-md)%;
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--ink);
@@ -573,12 +928,9 @@ kbd {
 .theme-toggle:hover { border-color: var(--ink); }
 
 /* ---------- Wave 3 B1/B2：书架 / 目录 / 书级导出 ----------
-   刻意不新造卡片样式：书架和目录直接用上面那套 .article-card / .article-grid，
-   这里只补三处书特有的东西（章号、下一章那行、导出的区间输入）。 */
+   刻意不新造列表样式：书架和目录直接用上面那套 .list-panel / .list-row，
+   这里只补书特有的东西（章号、原书目录、导出的区间输入）。 */
 
-.library-header__actions { display: flex; align-items: center; gap: 14px; }
-/* .back-link 自带 margin-bottom，放进这一行会把它顶歪 */
-.library-header__actions .back-link { margin-bottom: 0; }
 
 /* 章号。和标题同一行，压暗一档 —— 它是定位用的，不该抢标题的注意力 */
 .chapter-index {
@@ -587,13 +939,6 @@ kbd {
   margin-right: 8px;
 }
 
-/* 书架卡片上的「继续读：第 N 章 …」。用强调色，因为它才是这张卡要人点的地方 */
-.book-card__next {
-  margin-top: 8px;
-  font-size: 13px;
-  color: var(--pink-edge);
-}
-.article-card__button:disabled .book-card__next { color: var(--dim); }
 
 /* 复盘页底部的下一章入口（components/BookNextChapter.tsx） */
 .book-next {
@@ -618,14 +963,16 @@ kbd {
 .book-export__range input { width: 90px; }
 
 /* ---------- Wave 3B：固定书页、原书目录与回顾批次 ---------- */
-.book-fixed-actions,
+/* 书页导航还在正文流里，要自己的上下留白；
+   .book-fixed-actions 现在坐在 .page-header 右侧，留白由页头给 */
+.book-fixed-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; flex-shrink: 0; }
 .book-page-nav { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
 .btn-secondary {
   display: inline-flex;
   align-items: center;
   height: var(--control-h);
   border: 1px solid var(--line);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-md);
   padding: 0 18px;
   background: var(--surface);
   color: var(--ink);
@@ -634,62 +981,168 @@ kbd {
 }
 .btn-secondary:hover { border-color: var(--line-strong); }
 .btn-secondary:disabled { opacity: 0.5; }
-.book-toc { margin-top: 24px; border-top: 1px solid var(--line); }
-.book-toc-section { border-bottom: 1px solid var(--line); padding: 12px 0; }
-.book-part-title { font-size: 13px; color: var(--dim); margin: 18px 0 8px; text-transform: uppercase; }
-.book-toc-row { width: 100%; display: flex; justify-content: space-between; gap: 16px; text-align: left; background: none; border: 0; color: var(--ink); padding: 6px 0; }
-.book-page-list { display: grid; gap: 6px; margin: 8px 0 4px 16px; }
-.book-page-row { text-align: left; border: 0; background: none; color: var(--dim); padding: 5px 0; }
+/* 原书目录（fixed_pages）。它是可展开的两层结构，和三列表不是一回事，
+   所以只借 .list-panel 的外壳，行本身按自己的层级排。 */
+.book-toc { margin-top: 0; }
+.book-toc-section { border-bottom: 1px solid var(--line); padding: 0 24px; }
+.book-toc-section:last-child { border-bottom: none; }
+.book-part-title {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--dim);
+  margin: 18px 0 0;
+  text-transform: uppercase;
+}
+.book-toc-row {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  min-height: var(--control-h);
+  text-align: left;
+  background: none;
+  border: 0;
+  color: var(--ink);
+  font-size: 15px;
+  padding: 12px 0;
+}
+.book-toc-row:hover { color: var(--link-hover); }
+.book-page-list { display: grid; gap: 2px; margin: 0 0 10px 16px; }
+.book-page-row {
+  text-align: left;
+  border: 0;
+  background: none;
+  color: var(--dim);
+  font-size: 13px;
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+}
+.book-page-row:hover { background: var(--surface); color: var(--ink); }
 .book-page-heading { font-size: 18px; margin: 30px 0 12px; }
 .book-page-image { display: block; max-width: min(100%, 620px); max-height: 70vh; object-fit: contain; margin: 28px auto; }
 .book-page-nav { justify-content: space-between; border-top: 1px solid var(--line); padding-top: 20px; margin-top: 36px; }
 .review-open-batches,
-.review-page-choice { border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin: 12px 0; }
+.review-page-choice { border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px 16px; margin: 12px 0; }
 .review-open-batches { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .review-open-batches h2,
 .review-page-choice h2 { font-size: 15px; margin: 0 0 10px; }
 .review-page-choice label { display: block; margin: 7px 0; color: var(--dim); }
 
 /* ---------- 窄屏 ----------
-   在这条之前，整个项目一条宽度断点都没有（唯一的 @media 是配色）。
-   手机上 toolbar 那一行 4 个子项挤在 390px 里，直接被压垮。 */
+   侧栏在这里变成底部三个 tab（稿子 16）。 */
 @media (max-width: 640px) {
   :root {
     /* 窄屏按钮更小，让位也跟着收 */
     --actions-w: 92px;
+
+    /* 正文和标题整体降一档。改 token 而不是在下面重写选择器 ——
+       加新组件时不用记得「窄屏那边也要补一条」。 */
+    --read-size: 18px;
+    --read-leading: 1.55;
+    --display-hero: 44px;
+    --display-page: 32px;
+    --display-row: 21px;
+    --title: 22px;
+    --sp-9: 48px;
+    --sp-8: 32px;
   }
 
-  .toolbar {
-    /* 换成两行。padding 恢复对称 —— 让位改由 .pens 自己做，
-       这样第二行能用满宽度，不会莫名其妙缩在左边。 */
-    flex-wrap: wrap;
-    gap: 8px 10px;
-    padding: max(8px, env(safe-area-inset-top)) 12px 8px;
+  /* ---- 壳：侧栏落到底部 ---- */
+
+  .app { flex-direction: column; }
+
+  .sidebar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 15;
+    width: auto;
+    flex-direction: row;
+    gap: 0;
+    padding: 6px 12px max(14px, env(safe-area-inset-bottom));
+    border-right: none;
+    border-top: 1px solid var(--line);
   }
 
-  /* 独占第一行。**写死 100% 而不是靠自然换行**：靠挤爆来换行的话，
-     屏幕稍宽一点就又变回一行，而那时 .right 会钻到右上角按钮底下。 */
-  .pens {
-    flex: 1 0 100%;
-    padding-right: var(--actions-w);   /* 给 fixed 的右上角操作区让位 */
+  /* 品牌和「继续读」在底栏里没有位置：品牌是桌面上的锚点，
+     继续读从「书」那个 tab 一步就能到。 */
+  .sidebar__brand,
+  .resume-card,
+  .sidebar__spacer { display: none; }
+
+  /* 导航和导入并排成 tab。图标在上、字在下，56px 高。 */
+  .sidebar__nav { flex-direction: row; flex-grow: 1; gap: 0; }
+  .sidebar__nav .nav-row,
+  .nav-row--ghost {
+    flex-grow: 1;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    height: 56px;
+    padding: 0;
+    font-size: 11px;
+    border: none;
+    background: transparent;
+    box-shadow: none;
   }
+  .nav-row.is-active { color: var(--ink); background: transparent; box-shadow: none; }
+  .nav-row__label { flex-grow: 0; }
+  /* 计数在底栏里只是噪音，tab 本来就只有三个 */
+  .nav-row__count { display: none; }
 
-  /* 提示语在手机上本来就半失效（没有 hover，也没有 Esc 键），
-     与其压成一条竖字，不如让出空间。 */
-  .hint-text { display: none; }
+  /* 用户行不跟着去底栏 —— 那里只放导航。浮到右上角，和壳外页面的
+     .app-actions 落在同一个位置，切页时不会跳来跳去。 */
+  .sidebar__user {
+    position: fixed;
+    top: max(8px, env(safe-area-inset-top));
+    right: 12px;
+    height: auto;
+    padding: 0;
+    gap: 6px;
+  }
+  .avatar,
+  .sidebar__user-name { display: none; }
 
-  .pen { height: 36px; padding: 0 10px; font-size: 12px; gap: 4px; }
-  .pen kbd { display: none; }   /* 数字快捷键在手机上按不出来 */
+  /* 底栏会盖住内容，主区补出它的高度 */
+  .app-main { padding: 24px 16px 96px; }
 
-  /* 第二行：推到右侧，与正文右边缘对齐 */
-  .right { margin-left: auto; gap: 10px; }
+  .page-header { flex-direction: column; align-items: flex-start; }
+
+  /* ---- 列表：三列压成两行 ---- */
+
+  .list-head { display: none; }
+  .list-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 12px;
+    padding: 16px 18px;
+  }
+  .list-row__main { grid-column: 1 / -1; }
+  .list-row__sub { display: none; }
+  .list-row__minutes { display: none; }
+  .list-row__state { justify-content: flex-end; }
+
+  /* ---- 阅读器 ---- */
+
+  .reader-bar {
+    /* 三列排不下。标题让位给笔——读的时候知道自己在标什么比知道篇名重要。 */
+    grid-template-columns: auto 1fr;
+    gap: 8px;
+    height: auto;
+    padding: 8px 10px;
+    padding-top: max(8px, env(safe-area-inset-top));
+  }
+  .reader-bar__title { display: none; }
+  .reader-bar__left { grid-row: 1; }
+  .segmented { grid-row: 1; margin-left: auto; }
+  .segmented > button { height: 38px; padding: 0 12px; font-size: 13px; gap: 6px; }
+  .reader-bar__right { grid-column: 1 / -1; gap: 12px; }
+  .pen__badge { display: none; }
+
+  .reader-column { padding: 28px 16px 140px 28px; }
 
   .wrap { padding: 20px 16px 100px; }
-
-  .article-title { font-size: 26px; }
-  .paragraph { font-size: 18px; line-height: 1.85; }
-
-  .status-bar { justify-content: space-between; }
 
   .logout-btn { padding: 0 10px; font-size: 12px; }
   .book-toc-row { flex-direction: column; gap: 4px; }

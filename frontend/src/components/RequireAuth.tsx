@@ -5,44 +5,36 @@
  *   <RequireAuth><LibraryPage /></RequireAuth>
  */
 
-import { useEffect, useState, type ReactNode } from 'react'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { LOGIN_PATH, probeAuth, signOut, type AuthStatus } from '../lib/auth'
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { Navigate, useLocation } from 'react-router-dom'
+import { LOGIN_PATH, probeAuth, type AuthStatus } from '../lib/auth'
+import type { MeDto } from '../api/client'
 import AppActions from './AppActions'
 import '../styles/login.css'
 
-/** 退出入口。自身不定位 —— 位置由包着它的 <AppActions> 决定。 */
-function LogoutButton() {
-  const navigate = useNavigate()
-  const [leaving, setLeaving] = useState(false)
+/**
+ * 登录用户。守卫本来就为了判断登录态打了一次 /auth/me，之前只留下三态里的
+ * status、把 user 丢掉了；侧栏要显示用户名，与其再打一次，不如把这次的结果发下去。
+ *
+ * 只在 authed 分支下有值 —— 其余分支根本不渲染 children。
+ */
+const AuthUserContext = createContext<MeDto | null>(null)
 
-  const onClick = async () => {
-    setLeaving(true)
-    await signOut()
-    navigate(LOGIN_PATH, { replace: true })
-  }
-
-  return (
-    <button
-      className="logout-btn"
-      type="button"
-      onClick={onClick}
-      disabled={leaving}
-      title="退出登录"
-    >
-      退出
-    </button>
-  )
+export function useAuthUser(): MeDto | null {
+  return useContext(AuthUserContext)
 }
 
 export default function RequireAuth({ children }: { children: ReactNode }) {
   const location = useLocation()
   const [status, setStatus] = useState<AuthStatus>('checking')
+  const [user, setUser] = useState<MeDto | null>(null)
 
   useEffect(() => {
     let cancelled = false
     probeAuth().then((probe) => {
-      if (!cancelled) setStatus(probe.status)
+      if (cancelled) return
+      setStatus(probe.status)
+      setUser(probe.user)
     })
     return () => {
       cancelled = true
@@ -71,12 +63,7 @@ export default function RequireAuth({ children }: { children: ReactNode }) {
     )
   }
 
-  return (
-    <>
-      <AppActions>
-        <LogoutButton />
-      </AppActions>
-      {children}
-    </>
-  )
+  // 主题和退出按钮不再挂在右上角：它们进了 <AppShell> 的侧栏页脚。
+  // 'checking' 分支里那个 <AppActions> 留着 —— 那时候壳还没渲染。
+  return <AuthUserContext.Provider value={user}>{children}</AuthUserContext.Provider>
 }

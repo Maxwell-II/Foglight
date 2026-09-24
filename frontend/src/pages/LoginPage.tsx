@@ -103,9 +103,7 @@ export default function LoginPage() {
 
   return (
     <div className="wrap login-wrap">
-      <div className="brand">
-        Foglight <span className="brand__sub">雾灯</span>
-      </div>
+      <div className="brand">Foglight</div>
 
       <h1 className="title login-title" style={{ marginTop: 32 }}>登录</h1>
       <p className="dim login-sub">这是私人阅读器，账号由命令行建，不开放注册。</p>

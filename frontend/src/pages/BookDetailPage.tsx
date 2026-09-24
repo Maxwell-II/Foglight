@@ -14,10 +14,11 @@ import {
   type ChapterSummaryDto,
 } from '../api/client'
 import { openChapter } from '../components/BookNextChapter'
+import { ListPanel, ListRow, MarkedRowState } from '../components/ListPanel'
 
 /**
- * 目录页。章节卡片复用首页那套 .article-card —— 已读角标、「上次标了 N 处 →」
- * 的位置和行为都和首页一致，不新造一套交互。
+ * 目录页。章节列表复用文章库那套 .list-panel —— 三列、已读压暗、
+ * 「标了 N 处 →」的位置和行为都和文章库一致，不新造一套交互。
  *
  * 底部是按章导出：闭区间，按章号。**没有「按页导出」这回事**（§0.2）——
  * 页是重排后的视口产物，换个字号就变；这个项目的坐标是 (段序号, 词序号)。
@@ -133,7 +134,7 @@ export default function BookDetailPage() {
 
   if (error && !book) {
     return (
-      <div className="wrap">
+      <div className="page">
         <p className="error-banner">{error}</p>
         <Link to="/books">← 返回书架</Link>
       </div>
@@ -142,7 +143,7 @@ export default function BookDetailPage() {
 
   if (!book) {
     return (
-      <div className="wrap">
+      <div className="page">
         <p className="dim">加载中…</p>
       </div>
     )
@@ -150,25 +151,30 @@ export default function BookDetailPage() {
 
   if (book.readingMode === 'fixed_pages') {
     return (
-      <div className="wrap">
-        <Link className="back-link" to="/books">← 返回书架</Link>
-        <h1 className="title">{book.title}</h1>
-        <div className="meta">
-          {book.author ?? '佚名'} · 已读 {toc?.finishedPageCount ?? book.finishedPageCount}/
-          {toc?.pageCount ?? book.pageCount} 页 · 待回顾 {toc?.pendingReviewCount ?? book.pendingReviewCount} 处
-        </div>
+      <div className="page">
+        <header className="page-header">
+          <div className="page-header__text">
+            <Link className="crumb" to="/books">书</Link>
+            <h1 className="title">{book.title}</h1>
+            <p className="page-header__sub">
+              {book.author ?? '佚名'} · 按页读 · 已读 {toc?.finishedPageCount ?? book.finishedPageCount}/
+              {toc?.pageCount ?? book.pageCount} 页 · 待回顾{' '}
+              {toc?.pendingReviewCount ?? book.pendingReviewCount} 处
+            </p>
+          </div>
+          <div className="book-fixed-actions">
+            <Link className="btn-secondary" to={`/books/${book.id}/review`}>
+              待回顾与历史批次
+            </Link>
+            <button className="btn-primary" disabled={openingId !== null} onClick={() => void continueFixedBook()}>
+              {openingId !== null ? '打开中…' : '继续阅读'}
+            </button>
+          </div>
+        </header>
         {error && <p className="error-banner">{error}</p>}
-        <div className="book-fixed-actions">
-          <button className="btn-primary" disabled={openingId !== null} onClick={() => void continueFixedBook()}>
-            {openingId !== null ? '打开中…' : '继续阅读'}
-          </button>
-          <Link className="btn-secondary" to={`/books/${book.id}/review`}>
-            待回顾与历史批次
-          </Link>
-        </div>
         {!toc && !error && <p className="dim">目录加载中…</p>}
         {toc && (
-          <div className="book-toc">
+          <div className="book-toc list-panel">
             {toc.sections.map((section, index) => (
               <section className="book-toc-section" key={section.id}>
                 {section.partTitle && toc.sections[index - 1]?.partTitle !== section.partTitle && (
@@ -204,46 +210,58 @@ export default function BookDetailPage() {
   }
 
   return (
-    <div className="wrap">
-      <Link className="back-link" to="/books">
-        ← 返回书架
-      </Link>
-      <h1 className="title">{book.title}</h1>
-      <div className="meta">
-        {book.author ?? '佚名'} · 已读 {book.finishedChapterCount}/{book.chapterCount} 章 · 共标了{' '}
-        {book.totalMarks} 处
-      </div>
+    <div className="page">
+      <header className="page-header">
+        <div className="page-header__text">
+          <Link className="crumb" to="/books">书</Link>
+          <h1 className="title">{book.title}</h1>
+          <p className="page-header__sub">
+            {book.author ?? '佚名'} · 按章节读 · 已读 {book.finishedChapterCount}/{book.chapterCount} 章 · 共标了{' '}
+            {book.totalMarks} 处
+          </p>
+        </div>
+        {book.nextChapter && (
+          <button
+            className="btn-primary"
+            disabled={openingId !== null}
+            onClick={() => void openChapterCard(book.chapters.find((c) => c.id === book.nextChapter!.articleId) ?? book.chapters[0])}
+          >
+            继续读第 {book.nextChapter.orderIndex} 章
+          </button>
+        )}
+      </header>
 
       {error && <p className="error-banner">{error}</p>}
 
-      <ul className="article-grid">
+      <ListPanel columns={['章节', '篇幅', '状态']}>
         {book.chapters.map((c) => (
-          <li key={c.id} className="article-card">
-            <button
-              className={`article-card__button${c.isRead ? ' is-read' : ''}`}
-              disabled={openingId !== null}
-              onClick={() => openChapterCard(c)}
-            >
-              <h2 className="article-card__title">
+          <ListRow
+            key={c.id}
+            tone={c.resumeSessionId !== null ? 'reading' : c.isRead ? 'read' : null}
+            title={
+              <>
                 <span className="chapter-index">第 {c.orderIndex} 章</span>
                 {c.title}
-              </h2>
-              <div className="article-card__meta">
-                {c.isRead && <span className="read-badge">已读</span>}
-                {c.resumeSessionId !== null && <span className="read-badge">读到一半</span>}
-                {c.wordCount} 词 · 约 {c.estMinutes} 分钟
-              </div>
-              {openingId === c.id && <div className="dim">开始阅读中…</div>}
-            </button>
-            {/* 必须放在 button 外面：HTML 不允许 button 里再嵌可交互元素 */}
-            {c.lastMarksSessionId !== null && (
-              <Link className="article-card__marks" to={`/review/${c.lastMarksSessionId}`}>
-                上次标了 {c.lastMarksCount} 处 →
-              </Link>
-            )}
-          </li>
+              </>
+            }
+            meta={
+              <>
+                {c.wordCount} 词
+                <span className="list-row__minutes">约 {c.estMinutes} 分钟</span>
+              </>
+            }
+            state={
+              openingId === c.id ? (
+                <span className="list-row__state is-unread">打开中…</span>
+              ) : (
+                <MarkedRowState item={c} />
+              )
+            }
+            disabled={openingId !== null}
+            onOpen={() => void openChapterCard(c)}
+          />
         ))}
-      </ul>
+      </ListPanel>
 
       <section className="review book-export">
         <h2>导出标记</h2>

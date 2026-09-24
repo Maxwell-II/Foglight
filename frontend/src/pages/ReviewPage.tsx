@@ -66,7 +66,7 @@ export default function ReviewPage() {
 
   if (error) {
     return (
-      <div className="wrap">
+      <div className="page">
         <p className="error-banner">{error}</p>
         <Link to="/">返回文章库</Link>
       </div>
@@ -75,7 +75,7 @@ export default function ReviewPage() {
 
   if (!session || !article || markdown === null) {
     return (
-      <div className="wrap">
+      <div className="page">
         <p className="dim">加载中…</p>
       </div>
     )
@@ -85,16 +85,7 @@ export default function ReviewPage() {
   const unclearCount = session.marks.filter((m) => m.type === 'unclear').length
 
   return (
-    <div className="wrap">
-      <div className="site-header">
-        <span className="brand">
-          Foglight <span className="brand__sub">雾灯</span>
-        </span>
-        <Link className="back-link" to="/">
-          ← 返回文章库
-        </Link>
-      </div>
-
+    <div className="page">
       <h1 className="title">复盘：{article.title}</h1>
       <div className="meta">
         {article.author ?? '佚名'} · {article.wordCount} 词 · 状态：

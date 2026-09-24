@@ -16,6 +16,7 @@ import {
   type SessionDetailDto,
 } from '../api/client'
 import { useMarking } from '../hooks/useMarking'
+import { useCurrentParagraph } from '../hooks/useCurrentParagraph'
 import { ArticleBody } from '../components/reader/ArticleBody'
 import { PenToolbar } from '../components/reader/PenToolbar'
 import { marksAt } from '../lib/pos'
@@ -88,6 +89,10 @@ export default function ReaderPage() {
   }, [sessionId])
 
   const article = useMemo(() => (articleDto ? toArticle(articleDto) : null), [articleDto])
+
+  // 正文左侧的灯条：读到哪一段，哪一段亮
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const currentParagraph = useCurrentParagraph(bodyRef, article)
 
   // useMarking 必须无条件调用（React hooks 规则），文章还没加载完时给个空数组占位，
   // 此时 ArticleBody 还没渲染，不会有任何点击发生。
@@ -321,41 +326,47 @@ export default function ReaderPage() {
   }
 
   return (
-    <div className="app">
+    <div className="reader-page">
       <PenToolbar
         pen={marking.pen}
         state={marking.state}
         counts={counts}
         anchorText={anchorText}
+        backTo={articleDto.bookContext ? `/books/${articleDto.bookContext.bookId}` : '/'}
+        backLabel={articleDto.bookContext ? '返回目录' : '返回文章'}
+        title={article.title}
         onSetPen={marking.setPen}
         onCancel={marking.cancel}
         onFinish={finish}
-        finishLabel={articleDto.bookContext ? '结束本次阅读' : '完成阅读'}
+        finishLabel={articleDto.bookContext ? '结束本次阅读' : '读完了'}
       />
 
-      <div className="wrap">
-        <Link className="back-link" to={articleDto.bookContext ? `/books/${articleDto.bookContext.bookId}` : '/'}>
-          ← {articleDto.bookContext ? '返回目录' : '返回文章库'}
-        </Link>
+      {/* 640px 一栏，居中。返回和标题都搬进顶栏了，这里只剩正文本身 */}
+      <div className="reader-column">
         <h1 className="article-title">{article.title}</h1>
         <div className="meta">
           {articleDto.bookContext && `${articleDto.bookContext.sectionTitle} · 第 ${articleDto.bookContext.pageNumber}/${articleDto.bookContext.pageCount} 页 · `}
           {article.author || '佚名'} · {article.wordCount} 词 · 约 {article.estMinutes} 分钟
         </div>
 
-        <ArticleBody
-          paragraphs={article.paragraphs}
-          marks={allMarks}
-          preview={marking.preview}
-          onWordClick={handleWordClick}
-          onWordHover={marking.hoverWord}
-          layout={articleDto.bookPageLayout}
-          imageUrl={
-            articleDto.bookContext
-              ? (key) => `/api/books/${articleDto.bookContext!.bookId}/assets/${key}`
-              : undefined
-          }
-        />
+        {/* 包一层只为给灯条的 IntersectionObserver 一个查询根；
+            ArticleBody 不收 ref，也不该为了这件事改成 forwardRef */}
+        <div ref={bodyRef}>
+          <ArticleBody
+            paragraphs={article.paragraphs}
+            marks={allMarks}
+            preview={marking.preview}
+            onWordClick={handleWordClick}
+            onWordHover={marking.hoverWord}
+            layout={articleDto.bookPageLayout}
+            imageUrl={
+              articleDto.bookContext
+                ? (key) => `/api/books/${articleDto.bookContext!.bookId}/assets/${key}`
+                : undefined
+            }
+            currentParagraph={currentParagraph}
+          />
+        </div>
 
         {articleDto.bookContext && bookRunId && (
           <nav className="book-page-nav" aria-label="书页导航">

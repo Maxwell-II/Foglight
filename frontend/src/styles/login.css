@@ -22,9 +22,10 @@
 .login-card {
   margin-top: 28px;
   padding: 32px;
-  background: var(--surface);
+  background: var(--raised);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
 }
 
 .import-form.login-form {
@@ -81,7 +82,7 @@
   min-width: 0;
   /* .field input 的样式够用，这里只补一条：验证码是 4 位字母数字，
      等宽 + 加字距能让"是 8 还是 B"这种事在输入框里也看得清 */
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono);
   letter-spacing: 2px;
   text-transform: uppercase;
 }
@@ -110,7 +111,7 @@
   padding: 0 12px;
   display: inline-flex;
   align-items: center;
-  border-radius: 17px;
+  border-radius: var(--r-md);
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--dim);

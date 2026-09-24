@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import type { MarkingState, Pen } from '../../types'
 
 interface Props {
@@ -6,22 +7,60 @@ interface Props {
   counts: { unknown: number; unclear: number }
   /** 粉笔延伸中，起点那个词的原文；不在 extending 态时是 null */
   anchorText?: string | null
+  /** 顶栏左侧的返回目标和文章名 —— 阅读器在壳外面，它自己就是自己的导航 */
+  backTo: string
+  backLabel: string
+  title: string
   onSetPen: (pen: Pen) => void
   onCancel?: () => void
   onFinish: () => void
   finishLabel?: string
 }
 
-/** 模式化的界面必须让人一眼看出「现在处于什么状态」，否则点下去不知道会发生什么。 */
-function hintFor(state: MarkingState): string {
-  switch (state.kind) {
-    case 'idle':
-      return '点单词 = 标记陌生词'
-    case 'armed':
-      return '点一个词作为起点'
-    case 'extending':
-      return '移动鼠标选范围，再点一下完成（Esc 取消）'
+function BackIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M15 5l-7 7 7 7" />
+    </svg>
+  )
+}
+
+/**
+ * 底部浮出的胶囊。v2 用它取代了原来「把工具栏底边染色」的做法 ——
+ * 颜色能说「现在是粉笔」，说不了「起点定在哪个词」，而范围标记走到一半时
+ * 后者才是唯一要紧的信息。桌面和手机是同一个组件。
+ *
+ * 模式化的界面必须让人一眼看出「现在处于什么状态」，且不能只讲操作步骤：
+ * 陌生词 / 模糊处标的是两种不同的东西，所以 armed 态也要出一句，
+ * 说清「这支笔是干什么用的」，不只是「怎么点」。
+ */
+function MarkCapsule({
+  state,
+  anchorText,
+  onCancel,
+}: Pick<Props, 'state' | 'anchorText' | 'onCancel'>) {
+  if (state.kind === 'idle') return null
+
+  if (state.kind === 'armed') {
+    return (
+      <div className="capsule capsule--hint" role="status">
+        <span className="capsule__text">模糊处标一整段读不懂的话 —— 点第一个词定起点</span>
+      </div>
+    )
   }
+
+  return (
+    <div className="capsule" role="status">
+      <span className="capsule__text">
+        起点：<strong className="capsule__anchor">{anchorText ?? '…'}</strong>
+        <span className="capsule__aside">再点一下收尾</span>
+      </span>
+      <button type="button" className="capsule__cancel" onClick={onCancel}>
+        取消 · Esc
+      </button>
+    </div>
+  )
 }
 
 export function PenToolbar({
@@ -29,56 +68,64 @@ export function PenToolbar({
   state,
   counts,
   anchorText,
+  backTo,
+  backLabel,
+  title,
   onSetPen,
   onCancel,
   onFinish,
-  finishLabel = '完成阅读',
+  finishLabel = '读完了',
 }: Props) {
   return (
     <>
-      <div className={`toolbar toolbar--${pen}`}>
-        <div className="pens">
+      <div className="reader-bar">
+        <div className="reader-bar__left">
+          <Link className="icon-button" to={backTo} aria-label={backLabel} title={backLabel}>
+            <BackIcon />
+          </Link>
+          <span className="lamp lamp--sm" aria-hidden="true" />
+          <span className="reader-bar__title">{title}</span>
+        </div>
+
+        <div className="segmented" role="group" aria-label="笔">
           <button
-            className={`pen pen--yellow ${pen === 'yellow' ? 'is-active' : ''}`}
+            type="button"
+            className="pen--yellow"
+            aria-pressed={pen === 'yellow'}
             onClick={() => onSetPen('yellow')}
           >
-            <span className="swatch" /> 陌生词 <kbd>1</kbd>
+            <span className="swatch" aria-hidden="true" /> 陌生词
             <span className="pen__badge">{counts.unknown}</span>
           </button>
           <button
-            className={`pen pen--pink ${pen === 'pink' ? 'is-active' : ''}`}
+            type="button"
+            className="pen--pink"
+            aria-pressed={pen === 'pink'}
             onClick={() => onSetPen('pink')}
           >
-            <span className="swatch" /> 模糊处 <kbd>2</kbd>
+            <span className="swatch" aria-hidden="true" /> 模糊处
             <span className="pen__badge">{counts.unclear}</span>
           </button>
         </div>
 
-        <div className="hint-text">{hintFor(state)}</div>
-
-        <div className="right">
+        <div className="reader-bar__right">
           <span className="counts">
-            <b>{counts.unknown}</b> 词 · <b>{counts.unclear}</b> 处
+            <span className="counts__item">
+              <span className="dot dot--yellow" aria-hidden="true" />
+              {counts.unknown}
+            </span>
+            <span className="counts__item">
+              <span className="dot dot--pink" aria-hidden="true" />
+              {counts.unclear}
+            </span>
           </span>
-          <button className="btn-primary" onClick={onFinish}>
+          <button className="btn-primary" type="button" onClick={onFinish}>
             {finishLabel}
           </button>
         </div>
       </div>
 
-      {state.kind === 'extending' && (
-        <div className="status-bar">
-          <div className="status-bar__lead">
-            <span className="status-bar__dot" />
-            <span className="status-bar__text">
-              起点已定在 <strong>{anchorText ?? '…'}</strong> — 再点一下收尾
-            </span>
-          </div>
-          <button type="button" className="status-bar__cancel" onClick={onCancel}>
-            取消（Esc）
-          </button>
-        </div>
-      )}
+      <MarkCapsule state={state} anchorText={anchorText} onCancel={onCancel} />
     </>
   )
 }
