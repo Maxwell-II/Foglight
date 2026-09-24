@@ -26,7 +26,7 @@ import { ListPanel, ListRow } from '../components/ListPanel'
 import PublicLayout from '../components/PublicLayout'
 import { probeAuth, type AuthStatus } from '../lib/auth'
 import { readGuestRecord } from '../lib/guestStorage'
-import { TAGLINE } from '../lib/site'
+import { FEATURED_TITLE, TAGLINE } from '../lib/site'
 import '../styles/login.css'
 
 /** 示范短文的篇幅区间。公开库里短文是少数（design-brief §7②），没有就退回第一篇 */
@@ -37,6 +37,7 @@ const EXCERPT_WORDS = 90
 
 function pickFeatured(articles: ArticleSummaryDto[]): ArticleSummaryDto | null {
   return (
+    articles.find((a) => a.title === FEATURED_TITLE) ??
     articles.find((a) => a.wordCount >= FEATURED_MIN_WORDS && a.wordCount <= FEATURED_MAX_WORDS) ??
     articles[0] ??
     null
