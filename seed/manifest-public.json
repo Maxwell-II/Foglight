@@ -1,0 +1,17 @@
+{
+  "_comment": "公开库内容（redistributable）。只放可再分发的文本，和 manifest.json（owner 私有的版权内容）分开，灌公开库时只跑这一份。zenhabits.net 是公有领域（/uncopyright/），已去掉站内推广段，见 docs/public-release.md §7。",
+  "text_sources": [
+    {
+      "dir": "seed/public/zenhabits",
+      "author": "Leo Babauta",
+      "source_name": "zenhabits.net",
+      "license": "public_domain",
+      "redistributable": true,
+      "topics": [
+        "habits",
+        "mindfulness",
+        "simplicity"
+      ]
+    }
+  ]
+}
