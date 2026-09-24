@@ -166,7 +166,7 @@ export default function ReviewPage({ mode }: { mode: ReadingMode }) {
               <Link className="btn-primary" to="/register">
                 注册，保存记录
               </Link>
-              <Link className="btn-secondary" to="/">
+              <Link className="btn-secondary" to="/explore">
                 再读一篇
               </Link>
             </div>

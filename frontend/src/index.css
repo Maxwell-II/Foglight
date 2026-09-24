@@ -470,6 +470,45 @@ button { font-family: inherit; cursor: pointer; }
 }
 .segmented__count { font-size: 12px; color: var(--dim); }
 
+/* 翻页条（components/Pagination.tsx）。和分段控件同一套：底色 --shell、选中项浮起成 --raised */
+.paged-list { scroll-margin-top: 24px; }
+
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 16px;
+}
+.pager__pages { display: flex; align-items: center; gap: 4px; }
+.pager__step,
+.pager__num {
+  height: var(--control-h);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--raised);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.pager__step { padding: 0 14px; }
+.pager__num { min-width: var(--control-h); padding: 0 8px; font-variant-numeric: tabular-nums; }
+.pager__num[aria-current="page"] {
+  border-color: var(--ink-solid);
+  background: var(--ink-solid);
+  color: var(--on-ink);
+}
+.pager__step:disabled { opacity: 0.4; cursor: default; }
+.pager__step:not(:disabled):hover,
+.pager__num:not([aria-current="page"]):hover { border-color: var(--line-strong); color: var(--ink); }
+.pager__gap { padding: 0 4px; color: var(--dim); }
+.pager__compact { display: none; font-size: 14px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.pager__range { margin-left: auto; font-size: 13px; color: var(--dim); }
+
+.landing-more { margin: 16px 0 0; font-size: 14px; }
+.explore-header { margin-top: 8px; }
+
 /* 面包屑。页头标题上方那一行「书」—— 返回是它的副作用，不是它的全部意义，
    所以不写成 ← 返回书架 那种按钮语气的链接。 */
 .crumb {
@@ -1393,6 +1432,11 @@ button { font-family: inherit; cursor: pointer; }
   .public-header__actions .btn-secondary { height: 34px; padding: 0 12px; font-size: 13px; }
   .public-main { padding: 8px 16px 72px; }
   .public-footer { padding: 0 16px 32px; }
+
+  /* 窄屏：页码按钮收起，只留「上一页 3 / 13 下一页」一行 */
+  .pager__pages { display: none; }
+  .pager__compact { display: inline; }
+  .pager__range { flex-basis: 100%; margin-left: 0; }
 
   .featured { padding: 24px 20px; }
   .featured--loading { min-height: 320px; }

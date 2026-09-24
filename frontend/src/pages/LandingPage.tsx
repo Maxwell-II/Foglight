@@ -22,10 +22,10 @@ import {
   type ArticleSummaryDto,
 } from '../api/client'
 import AppActions from '../components/AppActions'
+import GuestRowState from '../components/GuestRowState'
 import { ListPanel, ListRow } from '../components/ListPanel'
 import PublicLayout from '../components/PublicLayout'
 import { probeAuth, type AuthStatus } from '../lib/auth'
-import { readGuestRecord } from '../lib/guestStorage'
 import { FEATURED_TITLE, TAGLINE } from '../lib/site'
 import '../styles/login.css'
 
@@ -34,6 +34,8 @@ const FEATURED_MIN_WORDS = 150
 const FEATURED_MAX_WORDS = 400
 /** 第一屏正文开头给多少词：够看出文风和难度，又不至于把 CTA 挤出首屏 */
 const EXCERPT_WORDS = 90
+/** 首推下面再给几篇。全量在 /explore 翻页看 —— 两百多篇铺在落地页上，页面长到滑不到底 */
+const MORE_COUNT = 6
 
 function pickFeatured(articles: ArticleSummaryDto[]): ArticleSummaryDto | null {
   return (
@@ -62,22 +64,6 @@ function excerptOf(paragraphs: string[][], limit: number): string[] {
 }
 
 /** 游客在这台浏览器里读过没有。只看有没有标记 / 有没有读完，光打开过不算 */
-function GuestRowState({ articleId }: { articleId: number }) {
-  const record = readGuestRecord(articleId)
-  if (record?.status === 'finished') {
-    return <span className="list-row__state">读过{record.marks.length > 0 && ` · 标了 ${record.marks.length} 处`}</span>
-  }
-  if (record && record.marks.length > 0) {
-    return (
-      <span className="list-row__state is-reading">
-        <span className="lamp lamp--sm" aria-hidden="true" />
-        在读 · 标了 {record.marks.length} 处
-      </span>
-    )
-  }
-  return <span className="list-row__state is-unread">未读</span>
-}
-
 function FeaturedCard({
   summary,
   detail,
@@ -176,10 +162,13 @@ export default function LandingPage() {
   }, [])
 
   const featured = useMemo(() => (articles ? pickFeatured(articles) : null), [articles])
-  const others = useMemo(
-    () => (articles && featured ? articles.filter((a) => a.id !== featured.id) : []),
-    [articles, featured],
-  )
+  // 推荐优先挑短文，和首推同一个理由：陌生人的第一篇不该是长文
+  const more = useMemo(() => {
+    if (!articles || !featured) return []
+    const rest = articles.filter((a) => a.id !== featured.id)
+    const short = rest.filter((a) => a.level === 'short')
+    return (short.length >= MORE_COUNT ? short : rest).slice(0, MORE_COUNT)
+  }, [articles, featured])
 
   useEffect(() => {
     if (!featured) return
@@ -286,13 +275,13 @@ export default function LandingPage() {
         </p>
       </section>
 
-      {others.length > 0 && (
+      {more.length > 0 && articles && (
         <section className="landing-section" aria-labelledby="more-title">
           <h2 id="more-title" className="landing-section__title">
-            其他公开文章
+            再挑一篇
           </h2>
           <ListPanel columns={['标题', '篇幅', '这台浏览器里']}>
-            {others.map((a) => (
+            {more.map((a) => (
               <ListRow
                 key={a.id}
                 title={a.title}
@@ -308,6 +297,9 @@ export default function LandingPage() {
               />
             ))}
           </ListPanel>
+          <p className="landing-more">
+            <Link to="/explore">浏览全部 {articles.length} 篇公开文章 →</Link>
+          </p>
         </section>
       )}
     </PublicLayout>

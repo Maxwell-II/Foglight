@@ -10,6 +10,7 @@ import AppShell from './components/AppShell'
 import PublicLayout from './components/PublicLayout'
 import RequireAuth, { useAuthUser } from './components/RequireAuth'
 import LandingPage from './pages/LandingPage'
+import ExplorePage from './pages/ExplorePage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import ForgotPage from './pages/ForgotPage'
@@ -47,6 +48,7 @@ export default function App() {
 
         {/* 落地页。已登录的人它自己会跳 /library */}
         <Route path="/" element={<LandingPage />} />
+        <Route path="/explore" element={<ExplorePage />} />
         <Route path="/index.html" element={<Navigate to="/" replace />} />
 
         {/* 游客阅读器：和 /read/:sessionId 是同一个组件，只是存储走 localStorage。

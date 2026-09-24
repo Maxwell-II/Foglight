@@ -137,8 +137,9 @@ export function guestReadingStore(articleId: number): ReadingStore {
     key: `guest:${articleId}`,
     readerPath: `/try/${articleId}`,
     reviewPath: `/try/${articleId}/review`,
-    homePath: '/',
-    homeLabel: '返回首页',
+    // 游客的「文章库」是 /explore：它记得翻到第几页，回去接着挑
+    homePath: '/explore',
+    homeLabel: '返回文章',
 
     async load() {
       let article: ArticleDetailDto
