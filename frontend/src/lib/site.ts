@@ -3,7 +3,7 @@
  */
 
 /** 落地页 tagline。候选见 public-release.md §5（还有「不必每个词都懂」），定稿前随时可换 */
-export const TAGLINE = '看不清也能往前读'
+export const TAGLINE = '读英文原文，读完立刻复盘'
 
 /**
  * 落地页首推的那篇。按标题认而不是按 id：本地和线上是分别入库的，id 对不上。

@@ -214,7 +214,7 @@ export default function LandingPage() {
       <section className="landing-hero">
         <p className="landing-tagline">{TAGLINE}</p>
         <p className="landing-lede">
-          一个英文阅读器。读的时候只做一件事：把卡住你的地方标出来。读完再集中解决。
+          遇到不认识的词或没读懂的段落，先标记下来。读完后直接导出，交给常用的 AI 或 Agent，集中梳理真正没读懂的地方，找出原因并复盘。
         </p>
 
         {listFailed ? (
@@ -250,24 +250,24 @@ export default function LandingPage() {
 
       <section className="landing-section" aria-labelledby="pens-title">
         <h2 id="pens-title" className="landing-section__title">
-          读的时候，只有两支笔
+          不懂的地方，随手标下来
         </h2>
         <div className="pen-cards">
           <div className="pen-card pen--yellow">
             <h3 className="pen-card__title">
-              <span className="swatch" aria-hidden="true" /> 陌生词
+              <span className="swatch" aria-hidden="true" /> 不认识的词
             </h3>
-            <p>点一下，标一个不认识的词；再点一下取消。</p>
+            <p>点一下标记，读完再处理。</p>
           </div>
           <div className="pen-card pen--pink">
             <h3 className="pen-card__title">
-              <span className="swatch" aria-hidden="true" /> 模糊处
+              <span className="swatch" aria-hidden="true" /> 没读懂的段落
             </h3>
-            <p>每个词都认识，连起来却读不懂的那一段：点第一个词，再点最后一个词。</p>
+            <p>词都认识，意思却没连起来？标出这一段，留到复盘时拆解。</p>
           </div>
           <div className="pen-card">
-            <h3 className="pen-card__title">读完</h3>
-            <p>得到一段复盘 prompt：原文加上你标的地方。复制到你常用的 AI 对话里，让它带你过一遍。</p>
+            <h3 className="pen-card__title">读完开始复盘</h3>
+            <p>导出原文、标记和复盘提示，继续在你常用的 AI 或 Agent 中讨论。</p>
           </div>
         </div>
         <p className="landing-note">
