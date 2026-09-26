@@ -130,12 +130,20 @@ class MarkCreate(ApiModel):
     start_word_idx: int = Field(ge=0)
     end_paragraph_idx: int = Field(ge=0)
     end_word_idx: int = Field(ge=0)
-    surface_text: str
-    context: str = ""
+    # 两个文本原来都不设长度，一处标记就能塞几 MB 进库。context 由前端按段落截到
+    # 240 字（client.ts 的 CONTEXT_MAX_CHARS，export.py 同一条规则）再加两个省略号；
+    # surface_text 是被标的原文，模糊处可以跨几句，给到 4000 字仍然远超真实用法。
+    # 上限放宽到真实值的几倍：老版本前端存在游客 localStorage 里的标记不能因此迁移失败
+    surface_text: str = Field(max_length=4000)
+    context: str = Field(default="", max_length=1000)
     book_run_id: int | None = None
 
 
 class MarkOut(MarkCreate):
+    # 长度上限只管写入。FastAPI 会按 response_model 校验返回值，继承下来的话，
+    # 线上加上限之前存进去的超长老标记一读就是 500
+    surface_text: str
+    context: str = ""
     id: int
     created_at: datetime
 

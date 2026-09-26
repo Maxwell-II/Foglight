@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
 
-from app.deps import CurrentUser, DbSession
+from app.deps import CurrentUser, DbSession, WritingUser, charge_writes
 from app.models import (
     Article,
     Book,
@@ -17,7 +17,13 @@ from app.models import (
     SessionStatus,
 )
 from app.routers.sessions import _get_owned_session
-from app.schemas import MarkCreate, MarkOut, MarksImportRequest, MarksImportResult
+from app.schemas import (
+    MAX_MARKS_PER_SESSION,
+    MarkCreate,
+    MarkOut,
+    MarksImportRequest,
+    MarksImportResult,
+)
 from app.services.mark_positions import first_position_error
 from app.visibility import visible_articles
 
@@ -26,9 +32,12 @@ router = APIRouter(tags=["marks"])
 
 @router.post("/sessions/{session_id}/marks", response_model=MarkOut, status_code=201)
 def create_mark(
-    session_id: int, payload: MarkCreate, db: DbSession, user: CurrentUser
+    session_id: int, payload: MarkCreate, db: DbSession, user: WritingUser
 ) -> Mark:
     session = _get_owned_session(db, session_id, user.id)
+    # 和游客导出 / 迁移同一个上限：迁移进来的会话最多 500 处，这里不能比它松
+    if db.query(Mark.id).filter(Mark.session_id == session.id).count() >= MAX_MARKS_PER_SESSION:
+        raise HTTPException(status_code=409, detail=f"这一篇已经标了 {MAX_MARKS_PER_SESSION} 处，不能再加了")
     article = db.get(Article, session.article_id)
     book = db.get(Book, article.book_id) if article and article.book_id else None
     if book and book.reading_mode == BookReadingMode.FIXED_PAGES:
@@ -127,6 +136,9 @@ def import_marks(payload: MarksImportRequest, db: DbSession, user: CurrentUser) 
     # —— 第二遍：一次写完 ——
     now = datetime.now(timezone.utc)
     to_import = [item for item in payload.sessions if item.article_id in articles]
+    # 按真正要写的行数扣配额（会话 + 标记），放在校验之后：校验不过的请求不写东西，
+    # 也不该吃掉配额。超了整个请求 429、一行不写，前端不清本地，明天还能再迁
+    charge_writes(user.id, rows=len(to_import) + sum(len(item.marks) for item in to_import))
     imported_marks = 0
     try:
         for item in to_import:

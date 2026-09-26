@@ -1,4 +1,4 @@
-"""登录 / 注册限流，状态放在进程内存里。
+"""登录 / 注册 / 验证码限流 + 单用户写入配额，状态放在进程内存里。
 
 为什么可以放内存（而不是数据库）：线上只有**一个** uvicorn 进程 ——
 `backend/Dockerfile` 的 `--workers 1` 是硬约束（VPS 只有 698Mi 可用，
@@ -14,7 +14,8 @@
 两种结构：
 
 - `SlidingWindowLimiter`：某个键在最近 N 秒里发生了几次。单 IP 的全局上限
-  （跨所有账号的登录失败、注册次数）用它。
+  （跨所有账号的登录失败、注册次数、取验证码）和单用户的写入配额（deps.py）用它。
+  `add(key, n)` 一次记 n 次：游客标记迁移一个请求写几百行，按行数扣。
 - `LoginFailureTracker`：(email, IP) 这一对的连续失败次数 + 锁定截止时间。
   语义照搬 Wave 3 按账号锁的那一套（3 次要验证码、8 次锁 15 分钟、锁过期清零、
   成功清零），只是键从「账号」换成了「账号 × IP」——
@@ -67,19 +68,28 @@ class SlidingWindowLimiter:
             hits = self._prune(key, self.clock())
             return len(hits) if hits else 0
 
-    def is_limited(self, key: Hashable) -> bool:
-        return self.count(key) >= self.limit
+    def is_limited(self, key: Hashable, n: int = 1) -> bool:
+        """再记 `n` 次会不会超。n 默认 1，即「已经满了没有」。"""
+        return self.count(key) + n > self.limit
 
-    def retry_after(self, key: Hashable) -> int:
-        """最早那一次滑出窗口还要几秒。给 429 的 Retry-After 头用。"""
+    def retry_after(self, key: Hashable, n: int = 1) -> int:
+        """还要几秒才腾得出 `n` 个名额。给 429 的 Retry-After 头用。
+
+        n 比整个上限还大时永远腾不出来，返回整个窗口长度 —— 调用方该拆小了再来。
+        """
         with self._lock:
             now = self.clock()
             hits = self._prune(key, now)
-            if not hits or len(hits) < self.limit:
+            held = len(hits) if hits else 0
+            # 要等最早的 k 次滑出窗口，剩下的才放得下 n 次
+            k = held - self.limit + n
+            if k <= 0:
                 return 0
-            return max(1, math.ceil(hits[0] + self.window_seconds - now))
+            if n > self.limit or hits is None:
+                return max(1, math.ceil(self.window_seconds))
+            return max(1, math.ceil(hits[k - 1] + self.window_seconds - now))
 
-    def add(self, key: Hashable) -> None:
+    def add(self, key: Hashable, n: int = 1) -> None:
         with self._lock:
             now = self.clock()
             hits = self._prune(key, now)
@@ -87,7 +97,7 @@ class SlidingWindowLimiter:
                 if len(self._hits) >= _MAX_KEYS:
                     self._evict(now)
                 hits = self._hits[key] = deque()
-            hits.append(now)
+            hits.extend([now] * n)
 
     def _evict(self, now: float) -> None:
         for key in list(self._hits):

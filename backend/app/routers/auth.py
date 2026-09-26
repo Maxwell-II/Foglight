@@ -22,6 +22,13 @@ main.py 已经把这个 router 挂上了（prefix="/api"），所以下面的路
 - **单个 IP 的全局上限**：跨所有账号，15 分钟 30 次失败 → 429。
   上一条单独用会放过「一个 IP 对着一万个邮箱各试 7 次」的撞库。
 
+2026-09-26 补了两处：
+
+- **注册必须过验证码**。原来只有「单 IP 每小时 5 次」，换代理就能绕开，
+  脚本注册的成本是零；现在每注册一个号要人认一张图。
+- **取验证码按 IP 限流**。/auth/captcha 不用登录、每打一次写一行库，
+  原来是全站唯一一个任何人都能无限写库的入口。
+
 计数在进程内存里，理由和前提见 app/services/ratelimit.py 顶部。
 """
 
@@ -71,6 +78,10 @@ IP_FAILURE_WINDOW_SECONDS = 15 * 60
 # 注册：单 IP 每小时 5 次。一个家庭 / 办公室 NAT 后面一小时注册 5 个号已经很多了
 REGISTER_LIMIT = 5
 REGISTER_WINDOW_SECONDS = 60 * 60
+# 取验证码：单 IP 10 分钟 30 张。本人登录连错、注册认错图、手动换图，
+# 十分钟里也用不到十张
+CAPTCHA_LIMIT = 30
+CAPTCHA_WINDOW_SECONDS = 10 * 60
 
 login_failures = LoginFailureTracker(
     captcha_after=CAPTCHA_AFTER_FAILURES,
@@ -79,6 +90,7 @@ login_failures = LoginFailureTracker(
 )
 login_ip_failures = SlidingWindowLimiter(IP_FAILURE_LIMIT, IP_FAILURE_WINDOW_SECONDS)
 register_attempts = SlidingWindowLimiter(REGISTER_LIMIT, REGISTER_WINDOW_SECONDS)
+captcha_requests = SlidingWindowLimiter(CAPTCHA_LIMIT, CAPTCHA_WINDOW_SECONDS)
 
 
 def reset_rate_limits() -> None:
@@ -86,6 +98,7 @@ def reset_rate_limits() -> None:
     login_failures.reset()
     login_ip_failures.reset()
     register_attempts.reset()
+    captcha_requests.reset()
 
 
 def _too_many(detail: str, limiter: SlidingWindowLimiter, key: str) -> HTTPException:
@@ -157,6 +170,9 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 class RegisterIn(_AuthModel):
     email: str = Field(max_length=320)
     password: str = Field(min_length=8, max_length=1024)
+    # 注册必须带验证码（和登录不同：登录是连错 3 次才要）
+    captcha_id: str = Field(max_length=64)
+    captcha_answer: str = Field(max_length=16)
 
     @field_validator("email")
     @classmethod
@@ -238,10 +254,15 @@ def register(payload: RegisterIn, request: Request, response: Response, db: DbSe
 
     格式不对由 RegisterIn 抛 422（FastAPI 在进到这里之前就挡掉了，所以格式错误
     不占限流名额 —— 输错一个字符不该让人离 429 更近）。
+
+    验证码答错 → 400，同样**不占**注册名额：它已经被一次性作废了，想再试就得
+    再取一张，而取验证码本身按 IP 限流。前端在任何失败之后都要换一张新图。
     """
     ip = client_ip(request)
     if register_attempts.is_limited(ip):
         raise _too_many("注册太频繁，请稍后再试", register_attempts, ip)
+    if not consume_challenge(db, payload.captcha_id, payload.captcha_answer):
+        raise HTTPException(status_code=400, detail="验证码不对，请换一张再试")
     # 409 也计数：否则「该邮箱已注册」就是一个不限次数的邮箱枚举接口
     register_attempts.add(ip)
 
@@ -285,7 +306,11 @@ def me(user: CurrentUser) -> MeOut:
 
 
 @router.get("/auth/captcha", response_model=CaptchaOut)
-def captcha(db: DbSession) -> CaptchaOut:
+def captcha(request: Request, db: DbSession) -> CaptchaOut:
+    ip = client_ip(request)
+    if captcha_requests.is_limited(ip):
+        raise _too_many("验证码刷新太频繁，请稍后再试", captcha_requests, ip)
+    captcha_requests.add(ip)
     challenge_id, svg = issue_challenge(db)
     return CaptchaOut(id=challenge_id, svg=svg)
 

@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Response
 from sqlalchemy import or_
 
-from app.deps import CurrentUser, DbSession
+from app.deps import CurrentUser, DbSession, WritingUser
 from app.models import Article, ReadingSession, SessionStatus
 from app.routers.articles import _get_visible_article
 from app.schemas import SessionCreate, SessionDetail, SessionOut, SessionUpdate
@@ -26,7 +26,7 @@ def _get_owned_session(db: DbSession, session_id: int, user_id: int) -> ReadingS
 
 
 @router.post("/sessions", response_model=SessionOut, status_code=201)
-def create_session(payload: SessionCreate, db: DbSession, user: CurrentUser) -> ReadingSession:
+def create_session(payload: SessionCreate, db: DbSession, user: WritingUser) -> ReadingSession:
     _get_visible_article(db, payload.article_id, user.id)  # 404 若文章不存在/不可见
 
     session = ReadingSession(user_id=user.id, article_id=payload.article_id)

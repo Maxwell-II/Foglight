@@ -25,7 +25,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 
-from app.deps import CurrentUser, DbSession
+from app.deps import CurrentUser, DbSession, WritingUser
 from app.visibility import visible_books
 from app.config import settings
 from app.models import (
@@ -508,7 +508,7 @@ def _recommended_page(db: DbSession, book: Book, user_id: int, run: BookReadingR
 
 
 @router.post("/books/{book_id}/reading-runs", response_model=ReadingRunOut)
-def start_reading_run(book_id: int, db: DbSession, user: CurrentUser) -> ReadingRunOut:
+def start_reading_run(book_id: int, db: DbSession, user: WritingUser) -> ReadingRunOut:
     book = _get_fixed_book(db, book_id, user.id)
     run = (
         db.query(BookReadingRun)
@@ -566,7 +566,7 @@ def open_book_page(
     run_id: int,
     payload: OpenBookPage,
     db: DbSession,
-    user: CurrentUser,
+    user: WritingUser,
 ) -> OpenBookPageResult:
     book = _get_fixed_book(db, book_id, user.id)
     run = db.get(BookReadingRun, run_id)
@@ -681,7 +681,7 @@ def create_review_batch(
     book_id: int,
     payload: ReviewBatchCreate,
     db: DbSession,
-    user: CurrentUser,
+    user: WritingUser,
 ) -> ReviewBatchDetail:
     book = _get_fixed_book(db, book_id, user.id)
     mark_ids = list(dict.fromkeys(payload.mark_ids))

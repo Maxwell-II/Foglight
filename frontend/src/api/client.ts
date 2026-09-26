@@ -24,6 +24,16 @@ export class ApiError extends Error {
   }
 }
 
+/** FastAPI 的错误体是 `{"detail": "..."}`，ApiError.message 里存的是原文。取出字符串形态的 detail，取不到给 null。 */
+export function apiDetail(err: ApiError): string | null {
+  try {
+    const detail: unknown = JSON.parse(err.message)?.detail
+    return typeof detail === 'string' ? detail : null
+  } catch {
+    return null
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const resp = await fetch(`${BASE}${path}`, {
     ...init,
@@ -443,9 +453,15 @@ export function getAuthProviders(): Promise<{ google: boolean }> {
 
 /**
  * 注册。成功是 201 + 用户，并且后端已经写好登录 cookie，不用再调一次 login。
- * 失败靠状态码区分：409 已注册 / 422 校验不过 / 429 限流 —— 调用方按 ApiError.status 分支。
+ * 失败靠状态码区分：400 验证码不对 / 409 已注册 / 422 校验不过 / 429 限流 —— 调用方按 ApiError.status 分支。
+ * 验证码必带，且提交一次就作废（答对答错都是）：任何失败之后都要换一张新图。
  */
-export function register(payload: { email: string; password: string }): Promise<MeDto> {
+export function register(payload: {
+  email: string
+  password: string
+  captchaId: string
+  captchaAnswer: string
+}): Promise<MeDto> {
   return request('/auth/register', { method: 'POST', body: JSON.stringify(payload) })
 }
 

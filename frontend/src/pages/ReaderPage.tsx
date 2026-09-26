@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ApiError, finishBookReading, openBookPage, toArticle, toMarkCreatePayload } from '../api/client'
+import {
+  ApiError,
+  apiDetail,
+  finishBookReading,
+  openBookPage,
+  toArticle,
+  toMarkCreatePayload,
+} from '../api/client'
 import { useMarking } from '../hooks/useMarking'
 import { useCurrentParagraph } from '../hooks/useCurrentParagraph'
 import { useReadingStore, type ReadingMode } from '../hooks/useReadingStore'
@@ -176,8 +183,15 @@ export default function ReaderPage({ mode }: { mode: ReadingMode }) {
           }
           localToStoredId.current.set(mark.id, storedId)
         })
-        .catch(() => {
-          showToast('有一条标记没能存下来，请重新点一下', 'error')
+        .catch((err: unknown) => {
+          // 429（写入配额）/ 409（每篇 500 处上限、书的阅读批次对不上）重点一下只会再撞一次，
+          // 直接把后端的原因说出来
+          showToast(
+            err instanceof ApiError && (err.status === 429 || err.status === 409)
+              ? (apiDetail(err) ?? '这条标记存不进去了')
+              : '有一条标记没能存下来，请重新点一下',
+            'error',
+          )
         })
       trackWrite(request)
     }

@@ -33,6 +33,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.db import get_db
 from app.models import AuthSession, User
+from app.services.ratelimit import SlidingWindowLimiter
 
 DbSession = Annotated[Session, Depends(get_db)]
 
@@ -173,6 +174,56 @@ def get_import_user(user: CurrentUser) -> User:
 
 
 ImportUser = Annotated[User, Depends(get_import_user)]
+
+
+# —— 单用户写入配额（2026-09-26）——
+#
+# 注册挡得住「一个 IP 刷一万个号」，挡不住「一个号写一百万行」：建会话、加标记、
+# 迁移游客标记这几条每打一次就往 SQLite 里多一行，原来没有任何上限，一个脚本
+# 就能把库撑爆（整机可用 698Mi）。这里按用户 id 计两个数：
+#
+# - 每分钟 60 个写请求：挡刷接口。真人标得再快也是几秒一处
+# - 每天 2000 行：挡灌库。迁移一个请求就能写几百行，所以按**行数**扣，不按请求数。
+#   库里最重的一天是 8 次会话、几十处标记，2000 是它的几十倍
+#
+# 只管**新增行**的路由。PATCH 进度、删标记不长库，不扣；刷它们的流量归 nginx 的
+# limit_req 管（deploy/nginx.conf）。计数在内存里，前提同 services/ratelimit.py 顶部。
+
+WRITES_PER_MINUTE = 60
+ROWS_PER_DAY = 2000
+_writes_per_minute = SlidingWindowLimiter(WRITES_PER_MINUTE, 60)
+_rows_per_day = SlidingWindowLimiter(ROWS_PER_DAY, 24 * 60 * 60)
+
+
+def reset_write_quotas() -> None:
+    """清空写入配额。给测试用；线上等价于重启进程。"""
+    _writes_per_minute.reset()
+    _rows_per_day.reset()
+
+
+def charge_writes(user_id: int, rows: int = 1) -> None:
+    """扣一次写请求 + `rows` 行配额，超了抛 429 且什么都不扣。"""
+    for limiter, n, detail in (
+        (_writes_per_minute, 1, "操作太频繁，请稍后再试"),
+        (_rows_per_day, rows, "今天写入的记录太多了，明天再试"),
+    ):
+        if limiter.is_limited(user_id, n):
+            raise HTTPException(
+                status_code=429,
+                detail=detail,
+                headers={"Retry-After": str(limiter.retry_after(user_id, n))},
+            )
+    _writes_per_minute.add(user_id)
+    _rows_per_day.add(user_id, rows)
+
+
+def get_writing_user(user: CurrentUser) -> User:
+    """新增一行的路由用它代替 CurrentUser：登录 + 扣一行配额。"""
+    charge_writes(user.id)
+    return user
+
+
+WritingUser = Annotated[User, Depends(get_writing_user)]
 
 
 # —— 客户端 IP（登录 / 注册限流用）——
