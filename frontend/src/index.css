@@ -262,6 +262,21 @@ button { font-family: inherit; cursor: pointer; }
   border-right: 1px solid var(--line);
 }
 
+/* 侧栏钉在视口里，只滚主区。不钉的话 .app 是 flex 行、侧栏被拉得和整页一样高，
+   用户行（主题 / 退出）就排在长目录的最底下，得滚到页尾才摸得到。
+   窗口矮到放不下时侧栏自己滚，不去挤压里面的东西。
+   窄屏下侧栏是 fixed 的底部 tab 条，不走这条。 */
+@media (min-width: 641px) {
+  .sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    height: 100dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
 .sidebar__brand {
   display: flex;
   align-items: center;
