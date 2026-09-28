@@ -3,9 +3,8 @@ name = "reading-saas-backend"
 version = "0.1.0"
 requires-python = ">=3.12"
 
-# ⚠️ 契约文件：由规划方维护，执行 agent 不得修改。
-# 依赖已按 Wave 1 全部任务包预先声明齐全，各包不需要（也不允许）往这里加。
-# 确实缺库时停下来报告，不要自己加 —— 别的包正在并行改同一个仓库。
+# ⚠️ 依赖是刻意收紧的：线上内存很紧，单 worker 常驻。加任何一个库之前先量它的
+# 加载内存，spacy / nltk / pandas / numpy / torch 这一类光加载就要几百 MB，不要引入。
 dependencies = [
     # Web 框架
     "fastapi>=0.115",
