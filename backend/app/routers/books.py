@@ -1,9 +1,6 @@
 """书籍路由（Wave 3 B1 / B2）：书架 / 目录 / 书级导出。
 
-⚠️ 这是规划方建的空壳：main.py 已经把它挂上了，书籍线的执行 agent 只需要在
-这里填内容，**不要去改 main.py** —— 那是登录线也会碰的文件，改它就撞车。
-
-要实现的接口见 docs/work-packets-wave3.md 第 3 节 B1 / B2。
+main.py 统一以 prefix="/api" 挂载这个 router，书籍相关的接口都只在这个文件里。
 
 书 = 章节的有序编组（§1.9），章节**就是 Article**。所以这里一行阅读逻辑都不新写：
   - 章节的会话派生值 → 直接 import routers/articles.py 的 _attach_session_state
@@ -350,7 +347,7 @@ def export_book(
     marks_by_article: dict[int, list[Mark]] = {}
     if chapters:
         # 一条 SQL 取回这些章上该用户的全部标记。marks 挂在会话上（models.py 的既定
-        # 设计：重读是新的一组），所以要经 reading_sessions 才能过滤到「他的」标记。
+        # 设计：重读是新的一组），所以要经 reading_sessions 才能过滤到「这个用户的」标记。
         rows = (
             db.query(ReadingSession.article_id, Mark)
             .join(ReadingSession, Mark.session_id == ReadingSession.id)
@@ -378,7 +375,7 @@ def export_book(
         if marks_by_article.get(c.id)
     ]
     if not views:
-        # 空壳 Markdown 比报错更糟：他会以为导出成功、粘给 agent 之后才发现没内容。
+        # 空壳 Markdown 比报错更糟：用户会以为导出成功、粘给 agent 之后才发现没内容。
         raise HTTPException(status_code=404, detail="这个范围里还没有标记")
 
     markdown = build_book_markdown(

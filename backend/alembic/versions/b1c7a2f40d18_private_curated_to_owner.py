@@ -7,16 +7,16 @@ Create Date: 2026-09-17
 为什么需要这次迁移（`docs/public-release.md` §3① / `app/visibility.py`）：
 
 `created_by IS NULL` 一直被当成"curated，所有人可见"。单用户时这没问题——
-"所有人"就是他自己。但库里 74 篇 curated **全部是 `copyrighted`**
-，所以一旦开放注册，这个语义就变成
+"所有人"就是 owner 自己。但库里 74 篇 curated **全部是 `copyrighted`**，
+所以一旦开放注册，这个语义就变成
 "把 74 篇有版权的正文发给每一个注册的人"。
 
 可见性规则因此改成了「公开库 = `created_by IS NULL` **且** `redistributable`」。
-但**只改规则会连他自己也看不到这 74 篇** —— 那是他每天在读的东西。
+但**只改规则会连 owner 自己也看不到这 74 篇** —— 那是 owner 每天在读的东西。
 所以这次迁移把它们改判给现有的那个用户：改完之后
 
     created_by IS NULL  ⟺  公开库（当前为空，这是事实不是 bug）
-    created_by = <他>   ⟺  他的私人书架
+    created_by = <owner>   ⟺  owner 的私人书架
 
 ⚠️ **只在库里恰好有一个用户时执行。** 多于一个就无法判断该给谁，
    与其猜一个不如原样不动、让人工来处理 —— 猜错的后果是把 A 的阅读材料

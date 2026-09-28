@@ -95,7 +95,7 @@ _GLYPHS: dict[str, list[list[tuple[int, int]]]] = {
 assert set(_GLYPHS) == set(ALPHABET), "glyph table and ALPHABET disagree"
 
 # 背景固定浅色 + 笔画固定深色：SVG 内联在页面里，跟随主题会让深色模式下
-# 描边和背景撞在一起变成一团黑，那时候他会以为是接口坏了。
+# 描边和背景撞在一起变成一团黑，那时候用户会以为是接口坏了。
 #
 # ⚠️ 这几个色值刻意挑成「任意 4 个连续字符里必定有一个字母表之外的字符」
 #    （小写十六进制字母 a-f 和数字 0/1 都不在 ALPHABET 里）。

@@ -15,7 +15,7 @@ import {
  * 这是一个刻意的取舍（work-packets-wave3.md §B1）：不做「读完直接跳下一章」，
  * 让复盘挡在中间，因为复盘才是这个产品的主张。用下来觉得挡路再议。
  *
- * ⚠️ 这个组件由书籍包拥有，ReviewPage.tsx 不归书籍包 —— 由 owner 手工接一行进去：
+ * ReviewPage.tsx 在复盘页底部挂它：
  *
  *     <BookNextChapter articleId={session.articleId} />
  *

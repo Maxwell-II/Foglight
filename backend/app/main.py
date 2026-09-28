@@ -1,7 +1,7 @@
 """FastAPI 应用入口。
 
-路由挂载留了位置但暂不引入 —— app/routers/ 由其他任务包并行开发中，
-它们完成后在下面的「路由挂载」处接上。
+路由在文件末尾统一挂载，每个 router 管自己的路径前缀以外的一切 ——
+新增接口只改对应的 app/routers/*.py，不用动这个文件。
 """
 
 from fastapi import FastAPI
@@ -38,8 +38,7 @@ from app.routers import articles, auth, books, marks, public, sessions  # noqa: 
 app.include_router(articles.router, prefix="/api")
 app.include_router(sessions.router, prefix="/api")
 app.include_router(marks.router, prefix="/api")
-# Wave 3：两个空壳已经挂好，books.py 和 auth.py 由各自的任务包填内容。
-# 这样 main.py 就不再是两条线的共享文件 —— 谁都不用改它。
+# 书籍和认证各自一个 router：两块功能互不 import，改一边不会碰到另一边。
 app.include_router(books.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
 # 游客接口（不需要登录）。单独一个 router，公开面一眼看得全

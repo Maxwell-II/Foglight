@@ -1,10 +1,9 @@
 """认证路由（Wave 3 A1）。
 
-main.py 已经把这个 router 挂上了（prefix="/api"），所以下面的路径都写全名
-`/auth/...`，**不要去改 main.py** —— 那是书籍线也会碰的文件。
+main.py 统一以 prefix="/api" 挂载这个 router，所以下面的路径都写全名 `/auth/...`。
 
-请求 / 响应模型直接定义在本文件里，**不写进 schemas.py** —— 那个文件归书籍线，
-两条线同时改一个文件正是 Wave 1 最贵的教训。
+请求 / 响应模型直接定义在本文件里，**不写进 schemas.py**：schemas.py 是文章和书的
+数据形状，认证的模型放在一起，改登录不会碰到阅读那一侧的文件。
 
 ⚠️ 登录失败返回 **200 + {ok: false}**，不是 401（§A1）。
    401 的语义是"你没权限访问这个资源"，而 /auth/login 本来就该让未登录的人
@@ -152,8 +151,8 @@ def _burn_time() -> None:
 class _AuthModel(BaseModel):
     """本文件内部的基类：输出 camelCase，输入两种写法都收。
 
-    和 schemas.ApiModel 的配置一致，但**故意不 import 它** —— schemas.py 归
-    书籍线，两条线并行期间少一条跨文件依赖少一次撞车。
+    和 schemas.ApiModel 的配置一致，但**故意不 import 它** —— 认证不依赖
+    阅读那一侧的模块，两边可以各自改动。
     """
 
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)

@@ -269,7 +269,7 @@ async def import_epub(
     resolved_book_title = (book_title or source_name or "未命名").strip() or "未命名"
 
     # 判重：同名书重复导入直接报错，不产生第二本 —— 两本同名书之后再也分不清
-    # 哪本上有他的标记，而标记是这个产品唯一不可再生的数据。
+    # 哪本上有用户的标记，而标记是这个产品唯一不可再生的数据。
     existing = (
         db.query(Book)
         .filter(Book.title == resolved_book_title, visible_books(user.id))

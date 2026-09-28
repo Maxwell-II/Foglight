@@ -81,7 +81,7 @@ class User(Base):
     # —— 凭据（Wave 3 §1.12）——
     # 两者都可空：id=1 这个用户在建号之前就是空的，不可空会让迁移直接失败。
     # ⚠️ 建号是给 id=1 补上这两列，不是新建用户 —— 全部历史会话和标记都挂在 id=1，
-    #    新建一个 id=2 登进去，他的标记会全部变成看不见的孤儿数据。
+    #    新建一个 id=2 登进去，原有标记会全部变成看不见的孤儿数据。
     email: Mapped[str | None] = mapped_column(String(320), unique=True, nullable=True)
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
