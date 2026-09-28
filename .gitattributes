@@ -2,3 +2,6 @@
 # Keep it versioned, but do not make normal reviews render a multi-megabyte diff.
 seed/book-data/*/pages.json -diff
 seed/book-data/*/assets/* binary
+
+# Shell scripts run under bash (VPS, and Git Bash for scripts/publish-public.sh); CRLF breaks them.
+*.sh text eol=lf
