@@ -12,8 +12,11 @@ export const TAGLINE = '读英文原文，读完立刻复盘'
 export const FEATURED_TITLE = 'The Only Way to Respond to Life'
 
 /**
- * 忘记密码的人工联系方式（v1 不做自助重置，user-flows §0）。
+ * 人工联系方式：/forgot 收不到验证码时的兜底、/privacy 的删号和数据请求。
  * 空字符串 = 还没定：/forgot 显示「联系方式即将公布」，不留一个点了没反应的死链接。
  * 填邮箱会渲染成 mailto 链接，填别的（微信号之类）原样显示。
+ *
+ * ⚠️ 只填转发地址，不填私人邮箱：这个值会打进前端包、进公开仓库。support@ 由 Cloudflare
+ *    Email Routing 转发到私人邮箱，回信用哪个邮箱由收件人自己决定（2026-09-28）。
  */
 export const SUPPORT_CONTACT: string = 'support@rnuxay.xyz'
