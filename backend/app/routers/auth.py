@@ -29,6 +29,15 @@ main.py 已经把这个 router 挂上了（prefix="/api"），所以下面的路
 - **取验证码按 IP 限流**。/auth/captcha 不用登录、每打一次写一行库，
   原来是全站唯一一个任何人都能无限写库的入口。
 
+2026-09-28 起注册和找回密码都走邮件验证码（推翻了 09-17 的「v1 不做自助重置」）：
+
+- 注册两步：/auth/register-code 发码（要图形验证码）→ /auth/register 凭码建号。
+  没通过邮件验证就不建账号，库里不会有未验证的账号。
+- 找回两步：/auth/reset-code → /auth/reset。发码接口对「邮箱存不存在」回一样的话，
+  信放到后台任务里发，免得靠响应快慢分辨出哪个邮箱注册过。
+- 发码比登录限得更严：发一封信要花服务商额度、伤发信信誉，还能被拿去轰炸别人
+  的邮箱。阈值见下面 CODE_*。
+
 计数在进程内存里，理由和前提见 app/services/ratelimit.py 顶部。
 """
 
@@ -40,7 +49,9 @@ import secrets
 from typing import Annotated
 from urllib.parse import quote, unquote
 
-from fastapi import APIRouter, HTTPException, Query, Request, Response
+import logging
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request, Response
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic.alias_generators import to_camel
@@ -58,11 +69,14 @@ from app.deps import (
     revoke_session,
     set_session_cookie,
 )
-from app.models import User
-from app.services import google_oauth
+from app.models import AuthSession, User
+from app.services import google_oauth, mailer
 from app.services.captcha import consume_challenge, issue_challenge, purge_expired
+from app.services.email_codes import CODE_TTL_MINUTES, consume_code, issue_code
 from app.services.password import hash_password, verify_password
 from app.services.ratelimit import LoginFailureTracker, SlidingWindowLimiter
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["auth"])
 
@@ -75,13 +89,21 @@ LOCK_MINUTES = 15
 # 又远低于撞库需要的量级
 IP_FAILURE_LIMIT = 30
 IP_FAILURE_WINDOW_SECONDS = 15 * 60
-# 注册：单 IP 每小时 5 次。一个家庭 / 办公室 NAT 后面一小时注册 5 个号已经很多了
-REGISTER_LIMIT = 5
-REGISTER_WINDOW_SECONDS = 60 * 60
 # 取验证码：单 IP 10 分钟 30 张。本人登录连错、注册认错图、手动换图，
 # 十分钟里也用不到十张
 CAPTCHA_LIMIT = 30
 CAPTCHA_WINDOW_SECONDS = 10 * 60
+# 发邮件验证码（注册和找回共用）。每封都要先过图形验证码，另外：
+# 同一邮箱 60 秒 1 封、一天 5 封 —— 挡的是拿我们去轰炸别人的邮箱；
+CODE_EMAIL_COOLDOWN_SECONDS = 60
+CODE_EMAIL_DAILY_LIMIT = 5
+# 同一 IP 一小时 10 封；
+CODE_IP_LIMIT = 10
+CODE_IP_WINDOW_SECONDS = 60 * 60
+# 全站一天 80 封：Resend 免费档是每天 100、每月 3000，超了会被停号。
+# ⚠️ 计数在内存里，重启进程会清零 —— 所以留了 20 封的余量，别把它调到 100。
+CODE_GLOBAL_DAILY_LIMIT = 80
+_DAY_SECONDS = 24 * 60 * 60
 
 login_failures = LoginFailureTracker(
     captcha_after=CAPTCHA_AFTER_FAILURES,
@@ -89,16 +111,23 @@ login_failures = LoginFailureTracker(
     lock_seconds=LOCK_MINUTES * 60,
 )
 login_ip_failures = SlidingWindowLimiter(IP_FAILURE_LIMIT, IP_FAILURE_WINDOW_SECONDS)
-register_attempts = SlidingWindowLimiter(REGISTER_LIMIT, REGISTER_WINDOW_SECONDS)
 captcha_requests = SlidingWindowLimiter(CAPTCHA_LIMIT, CAPTCHA_WINDOW_SECONDS)
+code_email_cooldown = SlidingWindowLimiter(1, CODE_EMAIL_COOLDOWN_SECONDS)
+code_email_daily = SlidingWindowLimiter(CODE_EMAIL_DAILY_LIMIT, _DAY_SECONDS)
+code_ip_hourly = SlidingWindowLimiter(CODE_IP_LIMIT, CODE_IP_WINDOW_SECONDS)
+code_global_daily = SlidingWindowLimiter(CODE_GLOBAL_DAILY_LIMIT, _DAY_SECONDS)
+_GLOBAL = "global"
 
 
 def reset_rate_limits() -> None:
     """清空全部内存计数。给测试用；线上等价于重启进程。"""
     login_failures.reset()
     login_ip_failures.reset()
-    register_attempts.reset()
     captcha_requests.reset()
+    code_email_cooldown.reset()
+    code_email_daily.reset()
+    code_ip_hourly.reset()
+    code_global_daily.reset()
 
 
 def _too_many(detail: str, limiter: SlidingWindowLimiter, key: str) -> HTTPException:
@@ -163,26 +192,44 @@ class ProvidersOut(_AuthModel):
 
 
 # 基本格式校验：有且只有一个 @，两边非空，域名里有点，全程没有空白。
-# 不追求 RFC 5322 —— 真正的校验是「能收到信」，那要等发信通道（§3b）。
+# 不追求 RFC 5322 —— 真正的校验是「能收到信」，那由邮件验证码负责。
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
-class RegisterIn(_AuthModel):
+class _EmailIn(_AuthModel):
     email: str = Field(max_length=320)
-    password: str = Field(min_length=8, max_length=1024)
-    # 注册必须带验证码（和登录不同：登录是连错 3 次才要）
-    captcha_id: str = Field(max_length=64)
-    captcha_answer: str = Field(max_length=16)
 
     @field_validator("email")
     @classmethod
     def _normalize_email(cls, value: str) -> str:
         # 先 trim 再转小写，和 /auth/login 的口径一致 —— 注册存进去的和登录查的
-        # 不是同一个写法，就会出现「注册成功但登不进去」
+        # 不是同一个写法，就会出现「注册成功但登不进去」。发码和凭码两步也必须
+        # 同一个口径，否则码存在 A@x.com 名下、校验时查的是 a@x.com。
         value = value.strip().lower()
         if not _EMAIL_RE.match(value):
             raise ValueError("邮箱格式不对")
         return value
+
+
+class SendCodeIn(_EmailIn):
+    # 每发一封都要过图形验证码
+    captcha_id: str = Field(max_length=64)
+    captcha_answer: str = Field(max_length=16)
+
+
+class SendCodeOut(_AuthModel):
+    #: 多少秒后才能再发。前端据此给「重新发送」按钮倒计时
+    cooldown_seconds: int
+
+
+class RegisterIn(_EmailIn):
+    code: str = Field(max_length=16)
+    password: str = Field(min_length=8, max_length=1024)
+
+
+class ResetIn(_EmailIn):
+    code: str = Field(max_length=16)
+    new_password: str = Field(min_length=8, max_length=1024)
 
 
 class CaptchaOut(_AuthModel):
@@ -248,36 +295,148 @@ def login(payload: LoginIn, request: Request, response: Response, db: DbSession)
     return LoginOut(ok=True, needs_captcha=False, locked_for_seconds=0)
 
 
-@router.post("/auth/register", response_model=MeOut, status_code=201)
-def register(payload: RegisterIn, request: Request, response: Response, db: DbSession) -> MeOut:
-    """邮箱 + 密码注册，成功即登录（写 cookie）。
+MAIL_UNAVAILABLE_DETAIL = "邮件验证码暂不可用"
+WRONG_CODE_DETAIL = "邮件验证码不对或已过期"
+WRONG_CAPTCHA_DETAIL = "验证码不对，请换一张再试"
 
-    格式不对由 RegisterIn 抛 422（FastAPI 在进到这里之前就挡掉了，所以格式错误
-    不占限流名额 —— 输错一个字符不该让人离 429 更近）。
 
-    验证码答错 → 400，同样**不占**注册名额：它已经被一次性作废了，想再试就得
-    再取一张，而取验证码本身按 IP 限流。前端在任何失败之后都要换一张新图。
+def _gate_send(db: DbSession, payload: SendCodeIn, ip: str) -> None:
+    """两个发码接口共用的关卡。顺序有讲究：
+
+    1. 没配发信 → 503，先于一切，免得人认完图才被告知不可用
+    2. 单 IP 上限 → 429，不碰数据库
+    3. 图形验证码 → 400。答错不占任何发信名额：图已经作废，再试要再取一张
+    4. 单邮箱冷却 / 单邮箱每日 / 全站每日 → 429
+
+    通过之后才记 IP 这一次；邮箱和全站的名额由调用方在**真发**的时候记。
+    """
+    if settings.mail_mode == "off":
+        raise HTTPException(status_code=503, detail=MAIL_UNAVAILABLE_DETAIL)
+    if code_ip_hourly.is_limited(ip):
+        raise _too_many("发送太频繁，请稍后再试", code_ip_hourly, ip)
+    if not consume_challenge(db, payload.captcha_id, payload.captcha_answer):
+        raise HTTPException(status_code=400, detail=WRONG_CAPTCHA_DETAIL)
+    if code_email_cooldown.is_limited(payload.email):
+        raise _too_many("刚发过，请稍等再重发", code_email_cooldown, payload.email)
+    if code_email_daily.is_limited(payload.email):
+        raise _too_many("这个邮箱今天收的验证码太多了，明天再试", code_email_daily, payload.email)
+    if code_global_daily.is_limited(_GLOBAL):
+        raise _too_many("今天的验证码发完了，请明天再试", code_global_daily, _GLOBAL)
+    code_ip_hourly.add(ip)
+
+
+def _charge_send(email: str) -> None:
+    code_email_cooldown.add(email)
+    code_email_daily.add(email)
+    code_global_daily.add(_GLOBAL)
+
+
+@router.post("/auth/register-code", response_model=SendCodeOut)
+def send_register_code(payload: SendCodeIn, request: Request, db: DbSession) -> SendCodeOut:
+    """注册第一步：往这个邮箱发 6 位验证码。
+
+    已注册 → 409，并且照样占 IP 名额：否则「该邮箱已注册」就是不限次数的邮箱枚举接口。
+    注册页本来就该告诉人「这个邮箱注册过了，去登录」，所以这里不装作不知道 ——
+    装的是找回那一边。
+
+    信同步发：发不出去要当场告诉人（502），不能让他对着空收件箱干等。
     """
     ip = client_ip(request)
-    if register_attempts.is_limited(ip):
-        raise _too_many("注册太频繁，请稍后再试", register_attempts, ip)
-    if not consume_challenge(db, payload.captcha_id, payload.captcha_answer):
-        raise HTTPException(status_code=400, detail="验证码不对，请换一张再试")
-    # 409 也计数：否则「该邮箱已注册」就是一个不限次数的邮箱枚举接口
-    register_attempts.add(ip)
-
+    _gate_send(db, payload, ip)
     if db.query(User.id).filter(User.email == payload.email).first() is not None:
         raise HTTPException(status_code=409, detail="该邮箱已注册")
+
+    code = issue_code(db, payload.email, mailer.PURPOSE_REGISTER)
+    _charge_send(payload.email)
+    try:
+        mailer.send_code(payload.email, code, mailer.PURPOSE_REGISTER, CODE_TTL_MINUTES)
+    except mailer.MailUnavailable:
+        raise HTTPException(status_code=503, detail=MAIL_UNAVAILABLE_DETAIL) from None
+    except mailer.MailError:
+        logger.exception("register code mail failed")
+        raise HTTPException(status_code=502, detail="邮件发送失败，请稍后再试") from None
+    return SendCodeOut(cooldown_seconds=CODE_EMAIL_COOLDOWN_SECONDS)
+
+
+@router.post("/auth/register", response_model=MeOut, status_code=201)
+def register(payload: RegisterIn, response: Response, db: DbSession) -> MeOut:
+    """注册第二步：邮件验证码 + 密码，建号并登录（写 cookie）。
+
+    格式不对由 RegisterIn 抛 422。验证码不对 → 400；同一封信的码累计输错 5 次作废，
+    暴力猜的上限由此而来，这一步不再单独按 IP 限流。
+    """
+    if not consume_code(db, payload.email, mailer.PURPOSE_REGISTER, payload.code):
+        raise HTTPException(status_code=400, detail=WRONG_CODE_DETAIL)
 
     user = User(email=payload.email, password_hash=hash_password(payload.password))
     db.add(user)
     try:
         db.commit()
     except IntegrityError:
-        # 两个请求同时注册同一个邮箱：上面的查询都没看到对方，靠唯一约束兜底
+        # 发码之后、凭码之前，这个邮箱被别的路注册了（比如同一个邮箱走了 Google）
         db.rollback()
         raise HTTPException(status_code=409, detail="该邮箱已注册") from None
     db.refresh(user)
+
+    token, _expires_at = issue_session(db, user)
+    set_session_cookie(response, token)
+    return _me(user)
+
+
+def _send_reset_mail(email: str, code: str) -> None:
+    """后台任务：响应已经回去了，失败只能记日志。用户等 60 秒可以重发。"""
+    try:
+        mailer.send_code(email, code, mailer.PURPOSE_RESET, CODE_TTL_MINUTES)
+    except (mailer.MailError, mailer.MailUnavailable):
+        logger.exception("reset code mail failed")
+
+
+@router.post("/auth/reset-code", response_model=SendCodeOut)
+def send_reset_code(
+    payload: SendCodeIn, request: Request, background: BackgroundTasks, db: DbSession
+) -> SendCodeOut:
+    """找回第一步。**不透露邮箱是否注册过**：
+
+    - 存不存在都回同样的 200，前端统一说「如果这个邮箱注册过，验证码已发出」
+    - 限流对两种邮箱一视同仁（冷却和每日上限都记），429 也不泄漏
+    - 信在后台任务里发：同步发的话，存在的邮箱要多等一次 Resend 往返，
+      掐表就能分辨出来
+
+    唯一的例外是全站每日名额只在真发的时候扣 —— 它是替服务商额度记账的。
+    用 Google 注册、没有密码的账号也能走这里：收得到信就证明邮箱是他的，
+    设一个密码等于多一条登录方式。
+    """
+    ip = client_ip(request)
+    _gate_send(db, payload, ip)
+    code_email_cooldown.add(payload.email)
+    code_email_daily.add(payload.email)
+
+    if db.query(User.id).filter(User.email == payload.email).first() is not None:
+        code_global_daily.add(_GLOBAL)
+        code = issue_code(db, payload.email, mailer.PURPOSE_RESET)
+        background.add_task(_send_reset_mail, payload.email, code)
+    return SendCodeOut(cooldown_seconds=CODE_EMAIL_COOLDOWN_SECONDS)
+
+
+@router.post("/auth/reset", response_model=MeOut)
+def reset_password(payload: ResetIn, request: Request, response: Response, db: DbSession) -> MeOut:
+    """找回第二步：验证码 + 新密码。改完**踢掉这个账号的所有登录**，当前设备重新登录。
+
+    踢掉全部是找回密码的本意 —— 来找回的人往往是怀疑密码泄漏了，别处那个
+    登录态可能就是别人的。
+    """
+    if not consume_code(db, payload.email, mailer.PURPOSE_RESET, payload.code):
+        raise HTTPException(status_code=400, detail=WRONG_CODE_DETAIL)
+    user = db.query(User).filter(User.email == payload.email).one_or_none()
+    if user is None:
+        # 发码之后账号被删了。和码不对回一样的话
+        raise HTTPException(status_code=400, detail=WRONG_CODE_DETAIL)
+
+    user.password_hash = hash_password(payload.new_password)
+    db.query(AuthSession).filter(AuthSession.user_id == user.id).delete(synchronize_session=False)
+    db.commit()
+    # 本人在这个 IP 上连错过密码才来找回的：把这一对的失败计数清掉，别让他改完还被锁着
+    login_failures.clear((payload.email, client_ip(request)))
 
     token, _expires_at = issue_session(db, user)
     set_session_cookie(response, token)

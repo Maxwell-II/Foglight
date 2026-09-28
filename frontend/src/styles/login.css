@@ -92,6 +92,39 @@
   color: var(--dim);
 }
 
+/* ---------- 邮件验证码（注册 / 找回，EmailCodeForm）---------- */
+
+/* 「已发到 xxx」：中性提示，不用 error-banner 的粉色 —— 这是好消息 */
+.code-sent {
+  margin: 0;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--info-fg);
+  background: var(--info-bg);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+}
+.code-sent strong { color: var(--ink); font-weight: 500; word-break: break-all; }
+
+/* 6 位数字：等宽 + 字距，抄的时候一眼对得上位 */
+.code-input { font-family: var(--font-mono); letter-spacing: 4px; }
+
+/* 「重新发送」是次要动作：文字按钮，倒计时期间置灰 */
+.code-resend {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 13px;
+  color: var(--dim);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.code-resend:hover { color: var(--ink); }
+.code-resend:disabled { text-decoration: none; cursor: default; color: var(--dim); }
+
 /* ---------- 守卫 ---------- */
 
 /* checking 态的占位：**故意什么都不画**。

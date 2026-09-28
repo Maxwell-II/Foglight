@@ -3,12 +3,13 @@
  *
  * 发布清单（public-release.md §6 第 6 步）的必需项，也是 Google OAuth 同意屏的必填链接。
  *
- * ⚠️ 这页是承诺，不是文案：每一条都对着代码核过（2026-09-24）。改了下面这些地方，这页要跟着改：
+ * ⚠️ 这页是承诺，不是文案：每一条都对着代码核过（2026-09-24，邮件部分 2026-09-28）。改了下面这些地方，这页要跟着改：
  *   - 存了什么：models.py（User / AuthSession / ReadingSession / Mark）、google_oauth.py 只取 sub + email
  *   - 密码：services/password.py（scrypt）；登录凭证：deps.py 只存 token_hash，30 天（session_ttl_days）
  *   - 游客导出：routers/public.py 的 /public/export 只算不存
  *   - IP：nginx 默认访问日志；services/ratelimit.py 的计数只在内存里
- *   - 第三方：index.html 从 Google Fonts 加载字体
+ *   - 第三方：index.html 从 Google Fonts 加载字体；services/mailer.py 把邮箱和验证码交给 Resend 发信
+ *   - 邮件验证码：models.EmailCode + services/email_codes.py，10 分钟过期、用过即删
  *   - 备份：deploy/backup.sh 每天一份、KEEP=7
  */
 
@@ -26,7 +27,7 @@ export default function PrivacyPage() {
       <h1 className="title login-title" style={{ marginTop: 32 }}>
         隐私说明
       </h1>
-      <p className="login-sub dim">更新于 2026 年 9 月 24 日</p>
+      <p className="login-sub dim">更新于 2026 年 9 月 28 日</p>
 
       <div className="login-card forgot-card privacy-card">
         <h2>不登录的时候</h2>
@@ -47,7 +48,16 @@ export default function PrivacyPage() {
             登录状态：浏览器里一个登录 cookie，30 天有效；服务器上只存它的哈希值。
           </li>
           <li>不登录时留下的本地标记，只有你点「导入」才会上传到账号里。</li>
+          <li>
+            注册和找回密码时发给你的邮件验证码：10 分钟内有效，用过或过期就删掉。
+          </li>
         </ul>
+
+        <h2>发验证码的邮件</h2>
+        <p>
+          验证码邮件由发信服务商 Resend 代发，所以你的邮箱地址和这封信的内容会经过 Resend。
+          除了发这封信，我们不用你的邮箱给你发任何别的东西。
+        </p>
 
         <h2>会看到你 IP 地址的地方</h2>
         <ul>

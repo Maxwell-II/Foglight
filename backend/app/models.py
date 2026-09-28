@@ -417,3 +417,27 @@ class CaptchaChallenge(Base):
     answer: Mapped[str] = mapped_column(String(16))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     used: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class EmailCode(Base):
+    """邮件验证码（注册 / 找回密码，2026-09-28）。
+
+    同一个 (email, purpose) 只留最新的一条：重发时先删旧的，旧码立刻失效。
+
+    码存明文，理由和 CaptchaChallenge 一样：10 分钟过期、用一次就删、输错 5 次
+    作废。备份里就算留下，也早过期了。
+
+    ⚠️ 注册的码在账号建出来之前就存在 —— 所以这里存 email 而不是 user_id，
+       也不对 users 建外键。
+    """
+
+    __tablename__ = "email_codes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    email: Mapped[str] = mapped_column(String(320), index=True)
+    #: "register" / "reset"，取值见 services/mailer.py 的 PURPOSE_*
+    purpose: Mapped[str] = mapped_column(String(16))
+    code: Mapped[str] = mapped_column(String(16))
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

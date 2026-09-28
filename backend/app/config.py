@@ -42,9 +42,29 @@ class Settings(BaseSettings):
     # 推导值一旦因为反代配置变动差一个字符，Google 就报 redirect_uri_mismatch。
     google_redirect_uri: str = ""
 
+    # —— 发信（注册验证码 / 找回密码，2026-09-28）——
+    # 线上由 deploy/docker-compose.yml 从 deploy/.env 注入。两个都配了才真的发信。
+    resend_api_key: str = ""
+    # 发件人，必须落在 Resend 里验证过的域名上，例如
+    # "Foglight <no-reply@mail.rnuxay.xyz>"。域名对不上 Resend 返回 403。
+    mail_from: str = ""
+
     @property
     def google_enabled(self) -> bool:
         return bool(self.google_client_id and self.google_client_secret)
+
+    @property
+    def mail_mode(self) -> str:
+        """"resend" 真发 / "console" 验证码打进日志 / "off" 邮箱注册和找回不可用。
+
+        没配 key 时靠 session_cookie_secure 区分本地和线上 —— 它本来就是「这是
+        https 线上」的开关，线上 compose 显式设了 true，本地默认 false。
+        这样两边零配置都是对的：本地不用申请 key 就能走通注册，线上漏配 key 时
+        宁可让功能暂不可用，也不把能登录别人账号的验证码写进 docker 日志。
+        """
+        if self.resend_api_key and self.mail_from:
+            return "resend"
+        return "off" if self.session_cookie_secure else "console"
 
 
 settings = Settings()

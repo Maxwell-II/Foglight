@@ -451,18 +451,42 @@ export function getAuthProviders(): Promise<{ google: boolean }> {
   return request('/auth/providers')
 }
 
-/**
- * 注册。成功是 201 + 用户，并且后端已经写好登录 cookie，不用再调一次 login。
- * 失败靠状态码区分：400 验证码不对 / 409 已注册 / 422 校验不过 / 429 限流 —— 调用方按 ApiError.status 分支。
- * 验证码必带，且提交一次就作废（答对答错都是）：任何失败之后都要换一张新图。
- */
-export function register(payload: {
+export interface SendCodePayload {
   email: string
-  password: string
   captchaId: string
   captchaAnswer: string
-}): Promise<MeDto> {
+}
+
+/**
+ * 发邮件验证码（注册 / 找回共用的形状）。成功返回多少秒后能重发。
+ * 失败：400 图形验证码不对 / 409 已注册（只有注册会有）/ 422 邮箱格式 /
+ * 429 发太频繁（detail 里有原因）/ 502 发信失败 / 503 发信没开。
+ * 图形验证码提交一次就作废（答对答错都是）：任何失败之后都要换一张新图。
+ */
+export function sendRegisterCode(payload: SendCodePayload): Promise<{ cooldownSeconds: number }> {
+  return request('/auth/register-code', { method: 'POST', body: JSON.stringify(payload) })
+}
+
+/** 找回密码发码。邮箱存不存在都回 200 —— 页面只能说「如果注册过，验证码已发出」。 */
+export function sendResetCode(payload: SendCodePayload): Promise<{ cooldownSeconds: number }> {
+  return request('/auth/reset-code', { method: 'POST', body: JSON.stringify(payload) })
+}
+
+/**
+ * 注册第二步。成功是 201 + 用户，并且后端已经写好登录 cookie，不用再调一次 login。
+ * 失败：400 邮件验证码不对或过期（输错 5 次那封信作废）/ 409 已注册 / 422 校验不过。
+ */
+export function register(payload: { email: string; code: string; password: string }): Promise<MeDto> {
   return request('/auth/register', { method: 'POST', body: JSON.stringify(payload) })
+}
+
+/** 找回第二步。成功后这个账号在别处的登录全部失效，当前浏览器已经登录。失败同 register 的 400 / 422。 */
+export function resetPassword(payload: {
+  email: string
+  code: string
+  newPassword: string
+}): Promise<MeDto> {
+  return request('/auth/reset', { method: 'POST', body: JSON.stringify(payload) })
 }
 
 /** Google 登录的起点。浏览器整页跳过去，不是 fetch —— 回调要带着 cookie 落回本站。 */
