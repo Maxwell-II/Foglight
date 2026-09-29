@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- 阅读器左边的灯条照着当前那一行。坐标全是偶数：16px 下每条正好落在整像素上，不糊。
+       颜色同 index.css 的 --ink-solid / --lamp；favicon.ico 和 apple-touch-icon.png 由它栅格化而来，改这里要一起重出。 -->
+  <rect width="32" height="32" rx="7" fill="#1f2b38"/>
+  <rect x="6" y="6" width="4" height="20" rx="2" fill="#f2b533"/>
+  <rect x="14" y="6" width="12" height="4" rx="2" fill="#e4e9ee" opacity=".35"/>
+  <rect x="14" y="14" width="12" height="4" rx="2" fill="#e4e9ee"/>
+  <rect x="14" y="22" width="8" height="4" rx="2" fill="#e4e9ee" opacity=".35"/>
+</svg>
