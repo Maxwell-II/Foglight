@@ -51,7 +51,7 @@ export default function PublicLayout({
       <footer className="public-footer">
         <Link to="/privacy">隐私说明</Link>
         <span aria-hidden="true"> · </span>
-        <span>文章来自公有领域和开放授权的作品，每篇都注明出处</span>
+        <span>文章来自公有领域、开放授权或经作者同意的作品，每篇都注明出处</span>
       </footer>
     </div>
   )

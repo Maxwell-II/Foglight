@@ -54,6 +54,9 @@ class License(StrEnum):
     PUBLIC_DOMAIN = "public_domain"
     COPYRIGHTED = "copyrighted"
     AI_GENERATED = "ai_generated"
+    # 仍然有版权，但作者书面允许这个站展示（可以 redistributable）。
+    # 授权只给了这一个站，不随代码走：别人部署同一份代码并不继承它。
+    AUTHOR_PERMISSION = "author_permission"
 
 
 class SessionStatus(StrEnum):
